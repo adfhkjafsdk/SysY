@@ -3,6 +3,7 @@
 %{
 
 #include <cstdio>
+#include <iostream>
 #include <cstring>
 #include <string>
 #include <vector>
@@ -14,8 +15,9 @@
 
 /*Flex supports comments*/
 
-WhiteSpace [ \t\r\n]
 LineComment "//".*
+BlockComment "/*"([^*]|"*"[^/])*"*/"
+WhiteSpace [ \t\r\n]
 
 Identifier [A-Za-z_][A-Za-z0-9_]*
 Decimal [1-9][0-9]*
@@ -25,13 +27,14 @@ Hexadecimal 0[xX][0-9A-Fa-f]+
 %%
 
 {WhiteSpace}	{ /* Ignore */ }
-{LineComment}	{ /* Ignore */ }
-"int"			{ return INT; }
-"return"		{ return RETURN; }
-{Identifier}	{ yylval.str_val = new std::string(yytext); return IDENT; }
-{Decimal}		{ yylval.int_val = std::strtol(yytext, nullptr, 0); return INT_CONST; }
-{Octal}			{ yylval.int_val = std::strtol(yytext, nullptr, 0); return INT_CONST; }
-{Hexadecimal}	{ yylval.int_val = std::strtol(yytext, nullptr, 0); return INT_CONST; }
+{LineComment}	{ /* Ignore */ std::cerr << "LineComment " << yytext <<'\n' ;}
+{BlockComment}	{ /* Ignore */ std::cerr << "BlockComment " << yytext <<'\n' ;}
+"int"			{  std::cerr << "INT " << yytext <<'\n' ;return INT;}
+"return"		{ std::cerr << "RETURN " << yytext <<'\n' ;return RETURN; }
+{Identifier}	{ std::cerr << "IDENT" << yytext <<'\n' ;yylval.str_val = new std::string(yytext); return IDENT; }
+{Decimal}		{ std::cerr << "DEC" << yytext <<'\n' ; yylval.int_val = std::strtol(yytext, nullptr, 0); return INT_CONST;  }
+{Octal}			{ std::cerr << "OCT" << yytext <<'\n' ; yylval.int_val = std::strtol(yytext, nullptr, 0); return INT_CONST;  }
+{Hexadecimal}	{ std::cerr << "HEX" << yytext <<'\n' ; yylval.int_val = std::strtol(yytext, nullptr, 0); return INT_CONST; }
 .				{ return yytext[0]; }
 
 %%

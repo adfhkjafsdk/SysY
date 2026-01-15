@@ -1,2 +1,4 @@
 bulid/*
 test/*
+!test/*.sysy
+compiler

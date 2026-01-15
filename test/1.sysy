@@ -1,0 +1,9 @@
+int main() {
+	// A comment 
+  /*   asdfghjkl
+  adsfadsfdsf	
+   多行注释注释注释		*/
+
+   /*注注注注注注注 */
+  return /*注2注2注2注2注2注2注2 */0;
+}
