@@ -1,6 +1,7 @@
 %code requires {
 	#include <memory>
 	#include <string>
+	#include "ast.hpp"
 }
 // This will be written to the header
 
@@ -10,17 +11,20 @@
 #include <memory>
 #include <string>
 
+#include "ast.hpp"
+
 int yylex();
-void yyerror(std::unique_ptr<std::string> &ast, const char *s);
+void yyerror(ASTree &ast, const char *s);
 
 %}
 // This will be written to the source
 
-%parse-param { std::unique_ptr<std::string> &ast }
+%parse-param { ASTree &ast }
 
 %union {
 	std::string *str_val;
 	int int_val;
+	BaseAST *ast_val;
 }
 
 // lexer 返回的所有 token 种类的声明
@@ -30,51 +34,60 @@ void yyerror(std::unique_ptr<std::string> &ast, const char *s);
 %token <int_val> INT_CONST
 
 // 非终结符类型定义
-%type <str_val> FuncDef FuncType Block Stmt Number
+%type <ast_val> FuncDef FuncType Block Stmt 
+%type <int_val> Number
 
 %%
 
 CompUnit
-  : FuncDef {
-	ast = std::unique_ptr<std::string>($1);
-  }
-  ;
+	: FuncDef {
+		auto tmp = std::make_unique<CompUnit>();
+		tmp -> func_def = PtrAST($1);
+		ast = std::move(tmp);
+	}
+	;
 
 FuncDef
 	: FuncType IDENT '(' ')' Block {
-		auto type = std::unique_ptr<std::string>($1);
-		auto ident = std::unique_ptr<std::string>($2);
-		auto block = std::unique_ptr<std::string>($5);
-		$$ = new std::string(*type + " " +  *ident + "() " + *block); 
+		auto tmp = new FuncDef;
+		tmp -> func_type = PtrAST($1);
+		tmp -> ident = *$2;
+		tmp -> block = PtrAST($5);
+		$$ = std::move(tmp);
 	}
 	;
 
 FuncType
 	: INT {
-		$$ = new std::string("int");
+		auto tmp = new FuncType;
+		tmp -> type = "int";
+		$$ = std::move(tmp);
 	}
 	;
 
 Block
 	: '{' Stmt '}' {
-		auto stmt = std::unique_ptr<std::string>($2);
-		$$ = new std::string("{ " + *stmt + " }");
+		auto tmp = new Block;
+		tmp -> stmt = PtrAST($2);
+		$$ = std::move(tmp);
 	}
 	;
 
 Stmt
 	: RETURN Number ';' {
-		auto val = std::unique_ptr<std::string>($2);
-		$$ = new std::string("return " + *val + ";");
+		auto tmp = new Stmt;
+		tmp -> number = $2;
+		$$ = std::move(tmp);
 	}
 
 Number
 	: INT_CONST {
-		$$ = new std::string(std::to_string($1));
+		$$ = $1;
 	}
 
 %%
 
-void yyerror(std::unique_ptr<std::string> &ast, const char *s) {
+void yyerror(ASTree &ast, const char *s) {
+	(void) ast ;
 	std::cerr << "error: " << s << std::endl;
 }

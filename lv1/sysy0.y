@@ -1,6 +1,7 @@
 %code requires {
 	#include <memory>
 	#include <string>
+	#include "ast.hpp"
 }
 // This will be written to the header
 
@@ -10,13 +11,15 @@
 #include <memory>
 #include <string>
 
+#include "ast.hpp"
+
 int yylex();
 void yyerror(std::unique_ptr<std::string> &ast, const char *s);
 
 %}
 // This will be written to the source
 
-%parse-param { std::unique_ptr<std::string> &ast }
+%parse-param { std::unique_ptr<BaseAST> &ast }
 
 %union {
 	std::string *str_val;
@@ -45,7 +48,7 @@ FuncDef
 		auto type = std::unique_ptr<std::string>($1);
 		auto ident = std::unique_ptr<std::string>($2);
 		auto block = std::unique_ptr<std::string>($5);
-		$$ = new std::string(*type + " " +  *ident + "() " + *block); 
+		$$ = new std::string(*type + " " +  *ident + "() " + *block);
 	}
 	;
 

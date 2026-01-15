@@ -3,8 +3,10 @@
 #include <memory>
 #include <string>
 
+#include "ast.hpp"
+
 extern FILE *yyin;
-extern int yyparse(std::unique_ptr<std::string> &ast);
+extern int yyparse (ASTree &ast);
 
 int main(int argc, char *argv[]) {
 	if(argc != 5) {
@@ -23,7 +25,7 @@ int main(int argc, char *argv[]) {
 		return 1;
 	}
 	
-	std::unique_ptr<std::string> ast;
+	ASTree ast;
 	int ret = yyparse(ast);
 	if(ret) {
 		fprintf(stderr, "Parse failed. Returned %d.\n", ret);
