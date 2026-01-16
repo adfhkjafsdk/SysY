@@ -1,43 +1,56 @@
 .PHONY: all clean headers
 
-SRC = src
-FLEX = flex
-BISON = bison
-CPP = clang++
-DEBUG = 0
+# This Makefile is compatible with autotest
+# autotest requirements:
+
+SRC := lv1
+FLEX := flex
+BISON := bison
+CPP := clang++
+DEBUG := 0
+
+CDE_LIBRARY_PATH ?= /opt/lib
+CDE_INCLUDE_PATH ?= /opt/include
+
+BUILD_DIR ?= build
+LIB_DIR ?= $(CDE_LIBRARY_PATH)/native
+INC_DIR ?= $(CDE_INCLUDE_PATH)
 
 ifeq ($(DEBUG), 1)
-  NDEBUG_FLAG =
+  NDEBUG_FLAG := 
 else
-  NDEBUG_FLAG = -DNDEBUG
+  NDEBUG_FLAG := -DNDEBUG
 endif
 
-CPP_FLAGS = -std=c++17 -O3 -Wall -Wextra -Wno-unused-result -lkoopa $(NDEBUG_FLAG)
+CPP_FLAGS = -std=c++17 -O3 -Wall -Wextra -Wno-unused-result $(NDEBUG_FLAG) -I$(INC_DIR) -L$(LIB_PATH) -lkoopa
 
-all: build/compiler
-# 	cp build/compiler .
+all: $(BUILD_DIR)/compiler
+	cp $(BUILD_DIR)/compiler .
 	echo "OK"
 
-build/compiler: $(SRC)/main.cpp build/sysy.lex.cpp build/sysy.tab.cpp
-	$(CPP) $(CPP_FLAGS) -o build/compiler $(SRC)/main.cpp build/sysy.lex.cpp build/sysy.tab.cpp 
+$(BUILD_DIR)/compiler: $(SRC)/main.cpp $(BUILD_DIR)/sysy.lex.cpp $(BUILD_DIR)/sysy.tab.cpp
+	$(CPP) $(CPP_FLAGS) -o $(BUILD_DIR)/compiler $(SRC)/main.cpp $(BUILD_DIR)/sysy.lex.cpp $(BUILD_DIR)/sysy.tab.cpp 
 
-build/sysy.lex.cpp: build $(SRC)/sysy.l $(SRC)/sysy.y headers
-	$(FLEX) -o build/sysy.lex.cpp $(SRC)/sysy.l
+$(BUILD_DIR)/sysy.lex.cpp: $(BUILD_DIR) $(SRC)/sysy.l $(SRC)/sysy.y headers
+	$(FLEX) -o $(BUILD_DIR)/sysy.lex.cpp $(SRC)/sysy.l
 
-build/sysy.tab.cpp: build $(SRC)/sysy.y headers
-	$(BISON) -d -o build/sysy.tab.cpp $(SRC)/sysy.y
+$(BUILD_DIR)/sysy.tab.cpp: $(BUILD_DIR) $(SRC)/sysy.y headers
+	$(BISON) -d -o $(BUILD_DIR)/sysy.tab.cpp $(SRC)/sysy.y
 
-build/debug.hpp: build headers
-	cp $(SRC)/debug.hpp build/debug.hpp
+headers: $(BUILD_DIR)/debug.hpp $(BUILD_DIR)/ast.hpp $(BUILD_DIR)/sysy_exceptions.hpp
 
-build:
-	mkdir build
+$(BUILD_DIR)/debug.hpp: $(SRC)/debug.hpp
+	cp $(SRC)/debug.hpp $(BUILD_DIR)/debug.hpp
 
-headers: $(SRC)/debug.hpp $(SRC)/ast.hpp $(SRC)/sysy_exceptions.hpp
-	cp $(SRC)/debug.hpp build/debug.hpp
-	cp $(SRC)/ast.hpp build/ast.hpp
-	cp $(SRC)/sysy_exceptions.hpp build/sysy_exceptions.hpp
+$(BUILD_DIR)/ast.hpp: $(SRC)/ast.hpp
+	cp $(SRC)/ast.hpp $(BUILD_DIR)/ast.hpp
+
+$(BUILD_DIR)/sysy_exceptions.hpp: $(SRC)/sysy_exceptions.hpp
+	cp $(SRC)/sysy_exceptions.hpp $(BUILD_DIR)/sysy_exceptions.hpp
+
+$(BUILD_DIR):
+	mkdir $(BUILD_DIR)
 
 clean:
-# 	rm -f compiler
-	rm -rf build
+	rm -f compiler
+	rm -rf $(BUILD_DIR)

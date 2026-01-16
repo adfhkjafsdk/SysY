@@ -1,4 +1,5 @@
 test
 build
+opt
 !test/*.sysy
 compiler
