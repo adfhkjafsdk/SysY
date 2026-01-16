@@ -15,7 +15,7 @@ endif
 CPP_FLAGS = -std=c++17 -O3 -Wall -Wextra -Wno-unused-result -lkoopa $(NDEBUG_FLAG)
 
 all: build/compiler
-	cp build/compiler .
+# 	cp build/compiler .
 	echo "OK"
 
 build/compiler: $(SRC)/main.cpp build/sysy.lex.cpp build/sysy.tab.cpp
@@ -33,10 +33,11 @@ build/debug.hpp: build headers
 build:
 	mkdir build
 
-headers: $(SRC)/debug.hpp $(SRC)/ast.hpp
+headers: $(SRC)/debug.hpp $(SRC)/ast.hpp $(SRC)/sysy_exceptions.hpp
 	cp $(SRC)/debug.hpp build/debug.hpp
 	cp $(SRC)/ast.hpp build/ast.hpp
+	cp $(SRC)/sysy_exceptions.hpp build/sysy_exceptions.hpp
 
 clean:
-	rm -f compiler
+# 	rm -f compiler
 	rm -rf build

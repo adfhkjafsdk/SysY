@@ -1,3 +1,3 @@
 #!/bin/sh
 
-./compiler 0 test/1.sysy -o -
+./build/compiler 0 test/1.sysy -o 1.koopa
