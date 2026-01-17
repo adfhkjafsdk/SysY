@@ -3,7 +3,7 @@
 # This Makefile is compatible with autotest
 # autotest requirements:
 
-SRC := lv1
+SRC := lv2
 FLEX := flex
 BISON := bison
 CPP := clang++
@@ -28,8 +28,8 @@ all: $(BUILD_DIR)/compiler
 	cp $(BUILD_DIR)/compiler .
 	echo "OK"
 
-$(BUILD_DIR)/compiler: $(SRC)/main.cpp $(BUILD_DIR)/sysy.lex.cpp $(BUILD_DIR)/sysy.tab.cpp
-	$(CPP) $(CPP_FLAGS) -o $(BUILD_DIR)/compiler $(SRC)/main.cpp $(BUILD_DIR)/sysy.lex.cpp $(BUILD_DIR)/sysy.tab.cpp 
+$(BUILD_DIR)/compiler: $(SRC)/main.cpp $(SRC)/asmgen.cpp $(BUILD_DIR)/sysy.lex.cpp $(BUILD_DIR)/sysy.tab.cpp
+	$(CPP) $(CPP_FLAGS) -o $(BUILD_DIR)/compiler $(SRC)/main.cpp $(SRC)/asmgen.cpp $(BUILD_DIR)/sysy.lex.cpp $(BUILD_DIR)/sysy.tab.cpp 
 
 $(BUILD_DIR)/sysy.lex.cpp: $(BUILD_DIR) $(SRC)/sysy.l $(SRC)/sysy.y headers
 	$(FLEX) -o $(BUILD_DIR)/sysy.lex.cpp $(SRC)/sysy.l
@@ -37,7 +37,7 @@ $(BUILD_DIR)/sysy.lex.cpp: $(BUILD_DIR) $(SRC)/sysy.l $(SRC)/sysy.y headers
 $(BUILD_DIR)/sysy.tab.cpp: $(BUILD_DIR) $(SRC)/sysy.y headers
 	$(BISON) -d -o $(BUILD_DIR)/sysy.tab.cpp $(SRC)/sysy.y
 
-headers: $(BUILD_DIR)/debug.hpp $(BUILD_DIR)/ast.hpp $(BUILD_DIR)/sysy_exceptions.hpp
+headers: $(BUILD_DIR)/debug.hpp $(BUILD_DIR)/ast.hpp $(BUILD_DIR)/sysy_exceptions.hpp $(BUILD_DIR)/mir.hpp
 
 $(BUILD_DIR)/debug.hpp: $(SRC)/debug.hpp
 	cp $(SRC)/debug.hpp $(BUILD_DIR)/debug.hpp
@@ -47,6 +47,9 @@ $(BUILD_DIR)/ast.hpp: $(SRC)/ast.hpp
 
 $(BUILD_DIR)/sysy_exceptions.hpp: $(SRC)/sysy_exceptions.hpp
 	cp $(SRC)/sysy_exceptions.hpp $(BUILD_DIR)/sysy_exceptions.hpp
+
+$(BUILD_DIR)/mir.hpp: $(SRC)/mir.hpp
+	cp $(SRC)/mir.hpp $(BUILD_DIR)/mir.hpp
 
 $(BUILD_DIR):
 	mkdir $(BUILD_DIR)

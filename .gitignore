@@ -1,5 +1,6 @@
 test
 build
 opt
+.vscode
 !test/*.sysy
 compiler
