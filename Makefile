@@ -3,7 +3,7 @@
 # This Makefile is compatible with autotest
 # autotest requirements:
 
-SRC := lv2
+SRC := lv3
 FLEX := flex
 BISON := bison
 CPP := clang++
