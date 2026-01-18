@@ -23,7 +23,7 @@ enum Operator {
 enum TypeTag { TT_INT32, TT_UNIT, TT_ARRAY, TT_POINTER, TT_FUNCTION };
 enum ValueTag { VT_SYMBOL, VT_INT, VT_UNDEF };
 enum StmtTag { ST_SYMDEF, ST_RETURN };
-enum SymbolDefTag { SDT_NUM, SDT_EXPR, SDT_}
+enum SymbolDefTag { SDT_EXPR };
 
 template <typename T>
 struct List {	// This is similar to std::span in C++20
@@ -111,28 +111,32 @@ struct ValueInfo: public MIRInfo {
 	}
 	ValueInfo(): tag{VT_UNDEF} {}
 	ValueInfo(const std::string &sym): tag{VT_SYMBOL} {
+		std::cerr << "My tag is SYMBOL\n"; 
 		symbol = new std::string(sym);
 	}
-	ValueInfo(int val): tag{VT_INT}, i32{val} {}
+	ValueInfo(int val): tag{VT_INT}, i32{val} { std::cerr << "My tag is INT\n"; }
+	
 };
 
 struct ExprInfo: public MIRInfo {
 	Operator op;
 	ValueInfo *left, *right;
+	ExprInfo() {}
+	ExprInfo(Operator op, ValueInfo *left, ValueInfo *right): op{op}, left{left}, right{right} {}
 	void clean() override {
 		left -> clean();
 		right -> clean();
 	}
 };
 
-struct SymbolDefInfo: public MIRInfo {
-	bool global;
-	std::string name;
-	ExprInfo *expr;
-	void clean() override {
-		expr -> clean();
-	}
-};
+// struct SymbolDefInfo: public MIRInfo {
+// 	bool global;
+// 	std::string name;
+// 	ExprInfo *expr;
+// 	void clean() override {
+// 		expr -> clean();
+// 	}
+// };
 
 struct StmtInfo: public MIRInfo {
 	StmtTag tag;

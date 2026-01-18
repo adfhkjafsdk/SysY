@@ -16,25 +16,27 @@ BUILD_DIR ?= build
 LIB_DIR ?= $(CDE_LIBRARY_PATH)/native
 INC_DIR ?= $(CDE_INCLUDE_PATH)
 
-ifeq ($(DEBUG), 1)
-  NDEBUG_FLAG := 
+ifneq ($(DEBUG), 0)
+  DEBUG_FLAG := -DYYDEBUG -g -fsanitize=undefined,address
+  OPTIMIZE_FLAG := -O0
 else
-  NDEBUG_FLAG := -DNDEBUG
+  DEBUG_FLAG := -DNDEBUG
+  OPTIMIZE_FLAG := -O3
 endif
 
-CPP_FLAGS = -std=c++17 -O3 -Wall -Wextra -Wno-unused-result $(NDEBUG_FLAG) -I$(INC_DIR) -L$(LIB_PATH) -lkoopa
+CPP_FLAGS = -std=c++20 -Wall -Wextra -Wno-unused-result $(OPTIMIZE_FLAG) $(DEBUG_FLAG) -I$(INC_DIR) -L$(LIB_PATH) -lkoopa
 
 all: $(BUILD_DIR)/compiler
 	cp $(BUILD_DIR)/compiler .
 	echo "OK"
 
-$(BUILD_DIR)/compiler: $(SRC)/main.cpp $(SRC)/asmgen.cpp $(BUILD_DIR)/sysy.lex.cpp $(BUILD_DIR)/sysy.tab.cpp
-	$(CPP) $(CPP_FLAGS) -o $(BUILD_DIR)/compiler $(SRC)/main.cpp $(SRC)/asmgen.cpp $(BUILD_DIR)/sysy.lex.cpp $(BUILD_DIR)/sysy.tab.cpp 
+$(BUILD_DIR)/compiler: $(SRC)/main.cpp $(SRC)/asmgen.cpp $(SRC)/irgen.cpp $(BUILD_DIR)/sysy.lex.cpp $(BUILD_DIR)/sysy.tab.cpp
+	$(CPP) $(CPP_FLAGS) -o $(BUILD_DIR)/compiler $(SRC)/main.cpp $(SRC)/asmgen.cpp $(SRC)/irgen.cpp $(BUILD_DIR)/sysy.lex.cpp $(BUILD_DIR)/sysy.tab.cpp 
 
-$(BUILD_DIR)/sysy.lex.cpp: $(BUILD_DIR) $(SRC)/sysy.l $(SRC)/sysy.y headers
+$(BUILD_DIR)/sysy.lex.cpp: $(BUILD_DIR) $(SRC)/sysy.l $(SRC)/sysy.y
 	$(FLEX) -o $(BUILD_DIR)/sysy.lex.cpp $(SRC)/sysy.l
 
-$(BUILD_DIR)/sysy.tab.cpp: $(BUILD_DIR) $(SRC)/sysy.y headers
+$(BUILD_DIR)/sysy.tab.cpp: $(BUILD_DIR) $(SRC)/sysy.y
 	$(BISON) -d -o $(BUILD_DIR)/sysy.tab.cpp $(SRC)/sysy.y
 
 headers: $(BUILD_DIR)/debug.hpp $(BUILD_DIR)/ast.hpp $(BUILD_DIR)/sysy_exceptions.hpp $(BUILD_DIR)/mir.hpp

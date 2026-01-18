@@ -45,15 +45,19 @@ int main(int argc, char *argv[]) {
 
 	std::cerr << *ast << std::endl;
 
-	std::ofstream fout(output, std::ios::out);
+	// return 0;
 
+	std::ofstream fout(output, std::ios::out);
+	
 	if(strcmp(mode, "-koopa") && strcmp(mode, "-riscv")) {
 		fprintf(stderr, "Unknown mode \"%s\"\n", mode);
 		return 1;
 	}
-
-	std::vector<MIRInfo*> _buf;
-	auto prog = dynamic_cast<ProgramInfo*> (ast -> DumpMIR(_buf).mir);
+	
+	// return 0;
+	auto prog = dynamic_cast<ProgramInfo*> (ast -> DumpMIR(nullptr).mir);
+	// return 0;
+	
 	if(!strcmp(mode, "-koopa")) {
 		ProgramToIR(fout, prog);
 	}
@@ -61,5 +65,6 @@ int main(int argc, char *argv[]) {
 		ProgramToASM(fout, prog);
 	}
 	prog -> clean();
+	// clean ast
 	return 0;
 }

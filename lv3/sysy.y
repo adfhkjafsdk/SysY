@@ -1,3 +1,5 @@
+%debug
+
 %code requires {
 	#include <memory>
 	#include <string>
@@ -34,8 +36,7 @@ void yyerror(ASTree &ast, const char *s);
 %token <int_val> INT_CONST
 
 // 非终结符类型定义
-%type <ast_val> FuncDef FuncType Block Stmt 
-%type <ast_val> Exp PrimaryExp UnaryExp MulExp AddExp EqExp LAndExp LOrExp
+%type <ast_val> FuncDef FuncType Block Stmt Exp PrimaryExp UnaryExp MulExp AddExp RelExp EqExp LAndExp LOrExp
 %type <int_val> Number
 
 %%
@@ -77,60 +78,73 @@ Block
 Stmt
 	: RETURN Exp ';' {
 		auto tmp = new Stmt;
-		tmp -> exp = $2;
+		tmp -> exp = PtrAST($2);
 		$$ = std::move(tmp);
 	}
+	;
 
 Exp
 	: LOrExp { $$ = std::move($1); }
+	;
 
 PrimaryExp
-	: "(" Exp ")" {}
-	| Number {}
+	: '(' Exp ')' { $$ = std::move($2); }
+	| Number {
+		auto tmp = new Number;
+		tmp->val = $1;
+		$$ = std::move(tmp);
+	}
+	;
 
 UnaryExp
-	: PrimaryExp {
-		
-	}
-	| "+" UnaryExp {}
-	| "-" UnaryExp {}
-	| "!" UnaryExp {}
+	: PrimaryExp { $$ = std::move($1); }
+	| '+' UnaryExp { $$ = new Expr(OP_POS, std::move($2), nullptr); }
+	| '-' UnaryExp { $$ = new Expr(OP_NEG, std::move($2), nullptr); }
+	| '!' UnaryExp { $$ = new Expr(OP_LNOT, std::move($2), nullptr); }
+	;
 
 MulExp
-	: UnaryExp {}
-	| MulExp "*" UnaryExp {}
-	| MulExp "/" UnaryExp {}
-	| MulExp "%" UnaryExp {}
+	: UnaryExp { $$ = std::move($1); }
+	| MulExp '*' UnaryExp { $$ = new Expr(OP_MUL, std::move($1), std::move($3)); }
+	| MulExp '/' UnaryExp { $$ = new Expr(OP_DIV, std::move($1), std::move($3)); }
+	| MulExp '%' UnaryExp { $$ = new Expr(OP_MOD, std::move($1), std::move($3)); }
+	;
 
 AddExp
-	: MulExp {}
-	| AddExp "+" MulExp {}
-	| AddExp "-" MulExp {}
+	: MulExp { $$ = std::move($1); }
+	| AddExp '+' MulExp { $$ = new Expr(OP_ADD, std::move($1), std::move($3)); }
+	| AddExp '-' MulExp { $$ = new Expr(OP_SUB, std::move($1), std::move($3)); }
+	;
 
 RelExp
-	: AddExp {}
-	| RelExp "<" AddExp {}
-	| RelExp ">" AddExp {}
-	| RelExp "<=" AddExp {}
-	| RelExp ">=" AddExp {}
+	: AddExp { $$ = std::move($1); }
+	| RelExp '<' AddExp { $$ = new Expr(OP_LT, std::move($1), std::move($3)); }
+	| RelExp '>' AddExp { $$ = new Expr(OP_GT, std::move($1), std::move($3)); }
+	| RelExp '<' '=' AddExp { $$ = new Expr(OP_LE, std::move($1), std::move($4)); }
+	| RelExp '>' '=' AddExp { $$ = new Expr(OP_GE, std::move($1), std::move($4)); }
+	;
 
 EqExp
-	: RelExp {}
-	| EqExp "==" RelExp {}
-	| EqExp "!=" RelExp {}
+	: RelExp { $$ = std::move($1); }
+	| EqExp '=' '=' RelExp { $$ = new Expr(OP_EQ, std::move($1), std::move($4)); }
+	| EqExp '!' '=' RelExp { $$ = new Expr(OP_NEQ, std::move($1), std::move($4)); }
+	;
 
 LAndExp
-	: EqExp {}
-	| LAndExp "&&" EqExp {}
+	: EqExp { $$ = std::move($1); }
+	| LAndExp '&' '&' EqExp { $$ = new Expr(OP_LAND, std::move($1), std::move($4)); }
+	;
 
 LOrExp
-	: LAndExp {}
-	| LOrExp "||" LAndExp {}
+	: LAndExp { $$ = std::move($1); }
+	| LOrExp '|' '|' LAndExp { $$ = new Expr(OP_LOR, std::move($1), std::move($4)); }
+	;
 
 Number
 	: INT_CONST {
 		$$ = $1;
 	}
+	;
 
 %%
 

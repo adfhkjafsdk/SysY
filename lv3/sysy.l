@@ -31,11 +31,11 @@ Hexadecimal 0[xX][0-9A-Fa-f]+
 {LineComment}	{ /* Ignore */ derr << "LineComment " << yytext <<'\n' ;}
 {BlockComment}	{ /* Ignore */ derr << "BlockComment " << yytext <<'\n' ;}
 "int"			{ derr << "INT " << yytext <<'\n' ;return INT;}
-"return"		{ derr << "RETURN " << yytext <<'\n' ;return RETURN; }
-{Identifier}	{ derr << "IDENT" << yytext <<'\n' ;yylval.str_val = new std::string(yytext); return IDENT; }
-{Decimal}		{ derr << "DEC" << yytext <<'\n' ; yylval.int_val = std::strtol(yytext, nullptr, 0); return INT_CONST;  }
-{Octal}			{ derr << "OCT" << yytext <<'\n' ; yylval.int_val = std::strtol(yytext, nullptr, 0); return INT_CONST;  }
-{Hexadecimal}	{ derr << "HEX" << yytext <<'\n' ; yylval.int_val = std::strtol(yytext, nullptr, 0); return INT_CONST; }
+"return"		{ derr << "RETURN " << yytext <<'\n' ; return RETURN; }
+{Identifier}	{ derr << "IDENT " << yytext <<'\n' ; yylval.str_val = new std::string(yytext); return IDENT; }
+{Decimal}		{ derr << "DEC " << yytext <<'\n' ; yylval.int_val = std::strtol(yytext, nullptr, 0); return INT_CONST;  }
+{Octal}			{ derr << "OCT " << yytext <<'\n' ; yylval.int_val = std::strtol(yytext, nullptr, 0); return INT_CONST;  }
+{Hexadecimal}	{ derr << "HEX " << yytext <<'\n' ; yylval.int_val = std::strtol(yytext, nullptr, 0); return INT_CONST; }
 .				{ derr << "SYMBOL " << yytext[0] << '\n'; return yytext[0]; }
 
 %%

@@ -7,7 +7,14 @@
 #include <string>
 #include <cassert>
 
-#include "ast.hpp"
+#include "mir.hpp"
+
+static std::string OperatorIR(Operator op) {
+	static std::string IR[] = {
+		"??", "??", "??", "mul", "div", "mod", "add", "sub",
+		"le", "ge", "lt", "gt", "eq", "ne", "and", "or" };
+	return IR[op];
+}
 
 std::string IRType(TypeInfo *mir) {
 	switch(mir -> tag) {
@@ -32,8 +39,33 @@ std::string IRType(TypeInfo *mir) {
 	}
 }
 
+void ValueToIR(std::ostream &out, ValueInfo *mir) {
+	std::cerr << "Will output tag = " << mir->tag << '\n';
+	if(mir->tag == VT_UNDEF) out << "undef";
+	else if(mir->tag == VT_INT) out << mir->i32;
+	else if(mir->tag == VT_SYMBOL) out << *(mir->symbol);
+}
+
+void ExprToIR(std::ostream &out, ExprInfo *mir) {
+	out << OperatorIR(mir->op) << " ";
+	ValueToIR(out, mir->left);
+	out << ", ";;
+	ValueToIR(out, mir->right);
+}
+
 void StmtToIR(std::ostream &out, StmtInfo *mir) {
-	out << "  " << "ret " << mir->number << '\n';
+	switch(mir->tag) {
+		case ST_SYMDEF:
+			out << "  " << *mir->symdef.name << " = ";
+			ExprToIR(out, mir->symdef.expr);
+			out << '\n';
+			break;
+		case ST_RETURN:
+			out << "  " << "ret ";
+			ValueToIR(out, mir->ret.val);
+			out << '\n';
+			break;
+	}
 }
 
 void BlockToIR(std::ostream &out, BlockInfo *mir) {

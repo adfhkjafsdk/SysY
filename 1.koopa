@@ -1,0 +1,9 @@
+  .text
+  .globl main
+fun @main( ): i32 {
+%entry:
+  %2 = ne 10, 0
+  %3 = ne 6, 0
+  %1 = and %2, %3
+  ret %1
+}
