@@ -1,5 +1,0 @@
-fun @main( ): i32 {
-%entry:
-  %1 = le 20, 30
-  ret %1
-}
