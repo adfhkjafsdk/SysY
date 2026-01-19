@@ -30,7 +30,7 @@ all: $(BUILD_DIR)/compiler
 	cp $(BUILD_DIR)/compiler .
 	echo "OK"
 
-$(BUILD_DIR)/compiler: $(SRC)/main.cpp $(SRC)/asmgen.cpp $(SRC)/irgen.cpp $(BUILD_DIR)/sysy.lex.cpp $(BUILD_DIR)/sysy.tab.cpp
+$(BUILD_DIR)/compiler: headers $(SRC)/main.cpp $(SRC)/asmgen.cpp $(SRC)/irgen.cpp $(BUILD_DIR)/sysy.lex.cpp $(BUILD_DIR)/sysy.tab.cpp
 	$(CPP) $(CPP_FLAGS) -o $(BUILD_DIR)/compiler $(SRC)/main.cpp $(SRC)/asmgen.cpp $(SRC)/irgen.cpp $(BUILD_DIR)/sysy.lex.cpp $(BUILD_DIR)/sysy.tab.cpp 
 
 $(BUILD_DIR)/sysy.lex.cpp: $(BUILD_DIR) $(SRC)/sysy.l $(SRC)/sysy.y
@@ -41,16 +41,16 @@ $(BUILD_DIR)/sysy.tab.cpp: $(BUILD_DIR) $(SRC)/sysy.y
 
 headers: $(BUILD_DIR)/debug.hpp $(BUILD_DIR)/ast.hpp $(BUILD_DIR)/sysy_exceptions.hpp $(BUILD_DIR)/mir.hpp
 
-$(BUILD_DIR)/debug.hpp: $(SRC)/debug.hpp
+$(BUILD_DIR)/debug.hpp: $(BUILD_DIR) $(SRC)/debug.hpp
 	cp $(SRC)/debug.hpp $(BUILD_DIR)/debug.hpp
 
-$(BUILD_DIR)/ast.hpp: $(SRC)/ast.hpp
+$(BUILD_DIR)/ast.hpp: $(BUILD_DIR) $(SRC)/ast.hpp
 	cp $(SRC)/ast.hpp $(BUILD_DIR)/ast.hpp
 
-$(BUILD_DIR)/sysy_exceptions.hpp: $(SRC)/sysy_exceptions.hpp
+$(BUILD_DIR)/sysy_exceptions.hpp: $(BUILD_DIR) $(SRC)/sysy_exceptions.hpp
 	cp $(SRC)/sysy_exceptions.hpp $(BUILD_DIR)/sysy_exceptions.hpp
 
-$(BUILD_DIR)/mir.hpp: $(SRC)/mir.hpp
+$(BUILD_DIR)/mir.hpp: $(BUILD_DIR) $(SRC)/mir.hpp
 	cp $(SRC)/mir.hpp $(BUILD_DIR)/mir.hpp
 
 $(BUILD_DIR):

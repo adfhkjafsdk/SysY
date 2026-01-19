@@ -88,10 +88,6 @@ void FuncToIR(std::ostream &out, FuncInfo *mir) {
 }
 
 void ProgramToIR(std::ostream &out, ProgramInfo *mir) {
-	out << "  .text\n";
-	for(auto func: mir -> funcs) {
-		out << "  .globl " << func->name << '\n';
-	}
 	for(auto func: mir -> funcs) {
 		FuncToIR(out, func);
 	}

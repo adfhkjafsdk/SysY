@@ -4,3 +4,7 @@ opt
 .vscode
 !test/*.sysy
 compiler
+*.o
+*.S
+*.koopa
+*.out
