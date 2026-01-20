@@ -13,8 +13,8 @@ int main() {
 	int hello = N+30;
 	hello = hello + 100 + 2*M;
 	int tmp, qwerty = hello * hello, tmp_2;
-	return 0;
+	// return 0;
 	// return hello;
-	// return hello == 20231 && qwerty/hello == hello;
+	return hello == 20232 && qwerty/hello == hello && hello/1000 >= 19;
 	// return N+M;
 }

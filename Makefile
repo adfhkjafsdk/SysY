@@ -25,7 +25,7 @@ else
   OPTIMIZE_FLAG := -O3
 endif
 
-CPP_FLAGS = -std=c++20 -Wall -Wextra -Wno-unused-result $(OPTIMIZE_FLAG) $(DEBUG_FLAG) -I$(INC_DIR) -L$(LIB_PATH) -lkoopa
+CPP_FLAGS = -std=c++20 -Wall -Wextra -Wno-unused-result $(OPTIMIZE_FLAG) $(DEBUG_FLAG) -I$(INC_DIR) -L$(LIB_DIR) -lkoopa
 
 all: $(BUILD_DIR)/compiler
 	cp $(BUILD_DIR)/compiler .
