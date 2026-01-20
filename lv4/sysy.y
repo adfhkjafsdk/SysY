@@ -59,6 +59,7 @@ FuncDef
 		tmp -> func_type = PtrAST($1);
 		tmp -> ident = *$2;
 		tmp -> block = PtrAST($5);
+		delete $2;
 		$$ = std::move(tmp);
 	}
 	;
@@ -142,6 +143,7 @@ LVal
 	: IDENT { 
 		auto tmp = new LVal;
 		tmp -> ident = *($1);
+		delete $1;
 		$$ = std::move(tmp);
 	}
 	;
@@ -164,6 +166,7 @@ ConstDef
 		tmp->type = nullptr;
 		tmp->expr = PtrAST($3);
 		tmp->next = nullptr;
+		delete $1;
 		$$ = std::move(tmp);
 	}
 	;
@@ -194,6 +197,7 @@ VarDef
 		tmp->type = nullptr;
 		tmp->expr = nullptr;
 		tmp->next = nullptr;
+		delete $1;
 		$$ = std::move(tmp);
 	}
 	| IDENT '=' InitVal {
@@ -202,6 +206,7 @@ VarDef
 		tmp->type = nullptr;
 		tmp->expr = PtrAST($3);
 		tmp->next = nullptr;
+		delete $1;
 		$$ = std::move(tmp);
 	}
 	;

@@ -2,6 +2,7 @@
 
 # This Makefile is compatible with autotest
 # autotest requirements:
+#	The main target file should be named 'compiler' and located in the $(BUILD_DIR) directory.
 
 SRC := lv4
 FLEX := flex

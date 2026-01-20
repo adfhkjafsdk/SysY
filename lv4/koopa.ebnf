@@ -16,6 +16,9 @@ GlobalMemoryDeclaration ::= "alloc" Type "," Initializer;
 Load ::= "load" SYMBOL;
 Store ::= "store" (Value | Initializer) "," SYMBOL;
 
+GetPointer ::= "getptr" SYMBOL "," Value;
+GetElementPointer ::= "getelemptr" SYMBOL "," Value;
+
 BinaryExpr ::= BINARY_OP Value "," Value;
 
 Branch ::= "br" Value "," SYMBOL "," SYMBOL;
@@ -34,6 +37,7 @@ EndStatement ::= Branch | Jump | Return;
 FunDecl ::= "decl" SYMBOL "(" [FunDeclParams] ")" [":" Type];
 FunDeclParams ::= Type {"," Type};
 
+# Below are extended definitions in compatible with SSA form
 Branch ::= "br" Value "," SYMBOL [BlockArgList] "," SYMBOL [BlockArgList];
 Jump ::= "jump" SYMBOL [BlockArgList];
 BlockArgList ::= "(" Value {"," Value} ")";

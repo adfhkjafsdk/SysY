@@ -5,6 +5,8 @@
 #include <iostream>
 #include <memory>
 #include <utility>
+#include <map>
+#include <cassert>
 
 #include "sysy_exceptions.hpp"
 #include "mir.hpp"
@@ -32,6 +34,13 @@ static std::string OperatorStr(Operator op) {
 enum ASTStmtTag {
 	AST_ST_VARDEF, AST_ST_CONSTDEF, AST_ST_ASSIGN, AST_ST_RETURN
 };
+
+struct TypeVal {	// unused
+	TypeInfo type;
+	int val;
+};
+
+static std::map<std::string, int> constVals;
 
 struct MIRRet {
 	MIRInfo *mir;
@@ -61,6 +70,7 @@ public:
 	virtual ~BaseAST() = default;
 	virtual void Dump(std::ostream&) const = 0;
 	virtual MIRRet DumpMIR(std::vector<MIRInfo*> *buf) const = 0;
+	virtual int Calc() const { return 0; }	// if the node is an expr, return the result
 	friend std::ostream &operator<< (std::ostream &stream, const BaseAST &ast) {
 		ast.Dump (stream);
 		return stream;
@@ -143,7 +153,9 @@ public:
 		std::vector<MIRInfo*> statements;
 		auto tmp = new BlockInfo;
 		tmp -> name = "%entry";
-		stmt -> DumpMIR(&statements);
+		if(stmt != nullptr) {
+			stmt -> DumpMIR(&statements);
+		}
 		tmp -> stmt .init(statements.size());
 		for(std::size_t i = 0; i < statements.size(); ++ i)
 			tmp -> stmt[i] = dynamic_cast<StmtInfo*>(statements[i]);
@@ -160,6 +172,26 @@ public:
 	void Dump(std::ostream &out) const override {
 		if(IsUnaryOperator(op)) out << OperatorStr(op) << " { " << *left << " }";
 		else out << OperatorStr(op) << " { " << *left << ", " << *right << " }";
+	}
+	int Calc() const override {
+		switch(op) {
+			case OP_POS:  return  left->Calc();
+			case OP_NEG:  return -left->Calc();
+			case OP_LNOT: return !left->Calc();
+			case OP_MUL:  return left->Calc() *  right->Calc();
+			case OP_DIV:  return left->Calc() /  right->Calc();
+			case OP_MOD:  return left->Calc() %  right->Calc();
+			case OP_ADD:  return left->Calc() +  right->Calc();
+			case OP_SUB:  return left->Calc() -  right->Calc();
+			case OP_LE:   return left->Calc() <= right->Calc();
+			case OP_GE:   return left->Calc() >= right->Calc();
+			case OP_LT:   return left->Calc() <  right->Calc();
+			case OP_GT:   return left->Calc() >  right->Calc();
+			case OP_EQ:   return left->Calc() == right->Calc();
+			case OP_NEQ:  return left->Calc() != right->Calc();
+			case OP_LAND: return left->Calc() && right->Calc();
+			case OP_LOR:  return left->Calc() || right->Calc();
+		}
 	}
 	MIRRet DumpMIR(std::vector<MIRInfo*> *buf) const override {
 		if(op == OP_POS) return left->DumpMIR(buf);
@@ -191,12 +223,14 @@ public:
 			if(op == OP_LAND) {
 				auto tmpLeft = new StmtInfo;
 				tmpLeft->tag = ST_SYMDEF;
+				tmpLeft->symdef.tag = SDT_EXPR;
 				tmpLeft->symdef.name = new std::string(GetTmp());
 				tmpLeft->symdef.expr = new ExprInfo(OP_NEQ, genValue(mirLeft), new ValueInfo(0));
 				buf->emplace_back(tmpLeft);
 				
 				auto tmpRight = new StmtInfo;
 				tmpRight->tag = ST_SYMDEF;
+				tmpRight->symdef.tag = SDT_EXPR;
 				tmpRight->symdef.name = new std::string(GetTmp());
 				tmpRight->symdef.expr = new ExprInfo(OP_NEQ, genValue(mirRight), new ValueInfo(0));
 				buf->emplace_back(tmpRight);
@@ -211,18 +245,48 @@ public:
 		}
 		auto symd = new StmtInfo;
 		symd -> tag = ST_SYMDEF;
+		symd -> symdef.tag = SDT_EXPR;
 		symd -> symdef.name = new std::string(crt);
 		symd -> symdef.expr = tmp;
 		buf -> emplace_back(symd);
 		if(op == OP_LOR) {
 			auto toBool = new StmtInfo;
 			toBool->tag = ST_SYMDEF;
+			toBool->symdef.tag = SDT_EXPR;
 			toBool->symdef.name = new std::string(GetTmp());
 			toBool->symdef.expr = new ExprInfo(OP_NEQ, new ValueInfo(crt), new ValueInfo(0));
 			buf->emplace_back(toBool);
 			crt = *toBool->symdef.name;
 		}
 		return MIRRet(nullptr, crt);
+	}
+};
+
+class LVal: public BaseAST {
+public:
+	std::string ident;
+	void Dump(std::ostream &out) const override {
+		out << "LVal { " << ident << " }";
+	}
+	int Calc() const override {
+		assert(constVals.find(ident) != constVals.end());
+		// std::cerr << "Calc const " << ident << " = " << constVals[ident] << '\n';
+		return constVals[ident];
+	}
+	MIRRet DumpMIR(std::vector<MIRInfo*> *buf) const override {
+		auto it = constVals.find(ident);
+		if(it != constVals.end())
+			return MIRRet(nullptr, it->second);
+		else {
+			// assert(0);
+			auto tmp = new StmtInfo;
+			tmp->tag = ST_SYMDEF;
+			tmp->symdef.tag = SDT_LOAD;
+			tmp->symdef.name = new std::string(GetTmp());
+			tmp->symdef.load = new std::string("@" + ident);
+			buf -> emplace_back(tmp);
+			return MIRRet(nullptr, *tmp->symdef.name);
+		}
 	}
 };
 
@@ -237,6 +301,8 @@ public:
 		if(next != nullptr) out << ", " << *next;
 	}
 	MIRRet DumpMIR(std::vector<MIRInfo*> *buf) const override {
+		detail->DumpMIR(buf);
+		if(next) next->DumpMIR(buf);
 		return MIRRet();
 	}
 };
@@ -251,6 +317,23 @@ public:
 		if(next != nullptr) out << ", " << *next;
 	}
 	MIRRet DumpMIR(std::vector<MIRInfo*> *buf) const override {
+		auto res = expr->DumpMIR(buf);
+		// TODO: Check if the type are matched. If not, report the error.
+		auto tmp = new StmtInfo;
+		tmp->tag = ST_SYMDEF;
+		tmp->symdef.tag = SDT_ALLOC;
+		tmp->symdef.name = new std::string("@" + name);
+		tmp->symdef.alloc = dynamic_cast<TypeInfo*>(type -> DumpMIR(nullptr).mir);
+		buf -> emplace_back(tmp);
+		
+		tmp = new StmtInfo;
+		tmp->tag = ST_STORE;
+		tmp->store.isValue = true;
+		tmp->store.val = genValue(res);
+		tmp->store.addr = new std::string("@" + name);
+		buf -> emplace_back(tmp);
+		
+		if(next) next->DumpMIR(buf);
 		return MIRRet();
 	}
 };
@@ -263,7 +346,8 @@ public:
 		out << "StmtConstDef { " << *type << ", " << name << ", " << *expr << " }";
 		if(next != nullptr) out << ", " << *next;
 	}
-	MIRRet DumpMIR(std::vector<MIRInfo*> *buf) const override {
+	MIRRet DumpMIR(std::vector<MIRInfo*> *) const override {
+		constVals[name] = expr -> Calc();
 		return MIRRet();
 	}
 };
@@ -275,6 +359,13 @@ public:
 		out << "StmtAssign { " << *lval << ", " << *expr << " }";
 	}
 	MIRRet DumpMIR(std::vector<MIRInfo*> *buf) const override {
+		auto res = expr->DumpMIR(buf);
+		auto tmp = new StmtInfo;
+		tmp -> tag = ST_STORE;
+		tmp -> store.isValue = true;
+		tmp -> store.val = genValue(res);
+		tmp -> store.addr = new std::string("@" + dynamic_cast<LVal*>(lval.get()) -> ident);
+		buf -> emplace_back(tmp);
 		return MIRRet();
 	}
 };
@@ -294,23 +385,13 @@ public:
 	}
 };
 
-class LVal: public BaseAST {
-public:
-	std::string ident;
-	void Dump(std::ostream &out) const override {
-		out << "LVal { " << ident << " }";
-	}
-	MIRRet DumpMIR(std::vector<MIRInfo*> *buf) const override {
-		return MIRRet();
-	}
-};
-
 class Number: public BaseAST {
 public:
 	int val;
 	void Dump(std::ostream &out) const override {
 		out << val ;
 	}
+	int Calc() const override { return val; }
 	MIRRet DumpMIR(std::vector<MIRInfo*>*) const override {
 		return MIRRet(nullptr, val);
 	}

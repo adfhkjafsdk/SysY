@@ -7,8 +7,11 @@ int main() {
 //   return /* OASFD */ +(- -!6);  // 看起来像个颜文字
 	// return ! (20 * -90 + 30 * 5 * 6 > 100 && 1+1+1!=2) * (2-1) || 8*/*eight*/8*/*huit*/8!=01000;
 	// return (1+2*3+5)%40 + !!!!!0;
-	const int N = 100;
-	int hello = 30 + N;
+	const int N = 50 * 2;
+	// return N + 30 + !N;
+	int hello = N+30;
+	// int hello = 30 + 20;
 	hello = hello + 100;
 	return hello == 230;
+	return 0;
 }

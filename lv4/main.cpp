@@ -52,7 +52,7 @@ int main(int argc, char *argv[]) {
 
 	std::cerr << *ast << std::endl;
 
-	return 0;
+	// return 0;
 
 	std::ofstream fout(output, std::ios::out);
 	
@@ -61,8 +61,8 @@ int main(int argc, char *argv[]) {
 		return 1;
 	}
 	
-	// return 0;
 	auto prog = dynamic_cast<ProgramInfo*> (ast -> DumpMIR(nullptr).mir);
+	std::cerr << "MIR generated!\n";
 	// return 0;
 	
 	if(!strcmp(mode, "-koopa")) {
@@ -71,7 +71,7 @@ int main(int argc, char *argv[]) {
 	else if(!strcmp(mode, "-riscv")) {
 		ProgramToASM(fout, prog);
 	}
-	prog -> clean();
+	delete prog;
 	// clean ast
 	return 0;
 }

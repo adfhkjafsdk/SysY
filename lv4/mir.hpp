@@ -9,6 +9,7 @@
 #include <cstdio>
 #include <string>
 #include <vector>
+#include <cassert>
 
 enum Operator {
 	OP_POS, OP_NEG, OP_LNOT,
@@ -22,8 +23,9 @@ enum Operator {
 
 enum TypeTag { TT_INT32, TT_UNIT, TT_ARRAY, TT_POINTER, TT_FUNCTION };
 enum ValueTag { VT_SYMBOL, VT_INT, VT_UNDEF };
-enum StmtTag { ST_SYMDEF, ST_RETURN };
-enum SymbolDefTag { SDT_EXPR };
+enum StmtTag { ST_SYMDEF, ST_RETURN, ST_STORE };
+enum SymbolDefTag { SDT_EXPR, SDT_LOAD, SDT_ALLOC };
+enum InitializerTag { IT_UNDEF, IT_NUM, IT_ZERO, IT_AGGR };
 
 template <typename T>
 struct List {	// This is similar to std::span in C++20
@@ -37,7 +39,7 @@ struct List {	// This is similar to std::span in C++20
 	void destruct() {
 		if(!len) return ;
 		for(std::size_t i = 0; i < len; ++ i) {
-			data[i] -> clean();
+			delete data[i];
 		}
 		delete[] data;
 	}
@@ -53,7 +55,7 @@ struct List {	// This is similar to std::span in C++20
 
 class MIRInfo{
 public:
-	virtual void clean() = 0;
+	virtual ~MIRInfo() = default;
 };
 
 struct TypeInfo: public MIRInfo {
@@ -71,20 +73,20 @@ struct TypeInfo: public MIRInfo {
 			TypeInfo *ret;	// If there's no return, this is nullptr.
 		} function;
 	};
-	void clean() override {
+	~TypeInfo() override {
 		switch(tag) {
 			case TT_INT32:
 			case TT_UNIT:
 				break;
 			case TT_ARRAY:
-				array.base -> clean();
+				delete array.base;
 				break;
 			case TT_POINTER:
-				pointer.base -> clean();
+				delete pointer.base;
 				break;
 			case TT_FUNCTION:
 				function.params.destruct();
-				if(function.ret != nullptr) function.ret -> clean();
+				if(function.ret != nullptr) delete function.ret;
 				break;
 		}
 	}
@@ -93,8 +95,8 @@ struct TypeInfo: public MIRInfo {
 struct VarInfo: public MIRInfo {
 	TypeInfo *type;
 	std::string name;
-	void clean() override {
-		type -> clean();
+	~ VarInfo() override {
+		delete type;
 	}
 };
 
@@ -104,15 +106,14 @@ struct ValueInfo: public MIRInfo {
 		std::string *symbol;
 		int i32;
 	};
-	void clean() override {
-		if(tag == VT_SYMBOL) delete symbol;
-	}
 	ValueInfo(): tag{VT_UNDEF} {}
 	ValueInfo(const std::string &sym): tag{VT_SYMBOL} {
 		symbol = new std::string(sym);
 	}
 	ValueInfo(int val): tag{VT_INT}, i32{val} { }
-	
+	~ValueInfo() override {
+		if(tag == VT_SYMBOL) delete symbol;
+	}
 };
 
 struct ExprInfo: public MIRInfo {
@@ -120,40 +121,66 @@ struct ExprInfo: public MIRInfo {
 	ValueInfo *left, *right;
 	ExprInfo() {}
 	ExprInfo(Operator op, ValueInfo *left, ValueInfo *right): op{op}, left{left}, right{right} {}
-	void clean() override {
-		left -> clean();
-		right -> clean();
+	~ExprInfo() override {
+		delete left;
+		delete right;
 	}
 };
 
-// struct SymbolDefInfo: public MIRInfo {
-// 	bool global;
-// 	std::string name;
-// 	ExprInfo *expr;
-// 	void clean() override {
-// 		expr -> clean();
-// 	}
-// };
+struct InitializerInfo: public MIRInfo {
+	InitializerTag tag;
+	int num;
+	std::vector<InitializerInfo*> aggr;
+};
 
 struct StmtInfo: public MIRInfo {
 	StmtTag tag;
 	union {
 		struct {
+			SymbolDefTag tag;
 			std::string *name;
-			ExprInfo *expr;
+			union {
+				ExprInfo *expr;
+				std::string *load;
+				TypeInfo *alloc;
+			};
 		} symdef;
 		struct {
 			ValueInfo *val;
 		} ret;
+		struct {
+			bool isValue;
+			union {
+				ValueInfo *val;
+				InitializerInfo *init;
+			};
+			std::string *addr;
+		} store;
 	};
-	void clean() override {
+	~StmtInfo() override {
 		switch(tag) {
 			case ST_SYMDEF:
 				delete symdef.name;
-				symdef.expr -> clean();
+				switch(symdef.tag) {
+					case SDT_EXPR:
+						delete symdef.expr;
+						break;
+					case SDT_LOAD:
+						delete symdef.load;
+						break;
+					case SDT_ALLOC:
+						delete symdef.alloc;
+						break;
+				}
 				break;
 			case ST_RETURN:
-				ret.val -> clean();
+				delete ret.val;
+				break;
+			case ST_STORE:
+				if(store.isValue) delete store.val;
+				else delete store.init;
+				delete store.addr;
+				break;
 		}
 	}
 };
@@ -161,7 +188,7 @@ struct StmtInfo: public MIRInfo {
 struct BlockInfo: public MIRInfo {
 	std::string name;
 	List<StmtInfo*> stmt;
-	void clean() override {
+	~BlockInfo() override {
 		stmt.destruct();
 	}
 };
@@ -171,8 +198,8 @@ struct FuncInfo: public MIRInfo {
 	std::string name;
 	List<VarInfo*> params;
 	List<BlockInfo*> block;
-	void clean() override {
-		if(ret != nullptr) ret -> clean();
+	~FuncInfo() override {
+		if(ret != nullptr) delete ret;
 		params.destruct();
 		block.destruct();
 	}
@@ -181,9 +208,9 @@ struct FuncInfo: public MIRInfo {
 struct ProgramInfo: public MIRInfo {
 	List<VarInfo*> vars;
 	List<FuncInfo*> funcs;
-	void clean() override {
-		for(auto x : vars) x -> clean();
-		for(auto f : funcs) f -> clean();
+	~ProgramInfo() override {
+		vars.destruct();
+		funcs.destruct();
 	}
 };
 

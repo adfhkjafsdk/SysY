@@ -56,14 +56,29 @@ void StmtToIR(std::ostream &out, StmtInfo *mir) {
 	switch(mir->tag) {
 		case ST_SYMDEF:
 			out << "  " << *mir->symdef.name << " = ";
-			ExprToIR(out, mir->symdef.expr);
-			out << '\n';
+			switch(mir->symdef.tag) {
+				case SDT_EXPR:
+					ExprToIR(out, mir->symdef.expr);
+					out << '\n';
+					break;
+				case SDT_LOAD:
+					out << "load " << *mir->symdef.load << '\n';
+					break;
+				case SDT_ALLOC:
+					out << "alloc " << IRType(mir->symdef.alloc) << '\n';
+					break;
+			}
 			break;
 		case ST_RETURN:
 			out << "  " << "ret ";
 			ValueToIR(out, mir->ret.val);
 			out << '\n';
 			break;
+		case ST_STORE:
+			out << "  " << "store ";
+			if(mir->store.isValue) ValueToIR(out, mir->store.val);
+			else assert(0);
+			out << ", " << *mir->store.addr << '\n';
 	}
 }
 
