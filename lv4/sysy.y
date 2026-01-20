@@ -91,8 +91,9 @@ Stmts
 
 Stmt
 	: CONST BType ConstDefs ';' {
+		auto shared = SharedAST($2);
 		for(auto it = dynamic_cast<StmtConstDef*>($3); it != nullptr; it = dynamic_cast<StmtConstDef*>(it->next.get()) ) {
-			it->type = PtrAST($2);
+			it->type = shared;
 		}
 		auto tmp = new Stmt;
 		tmp->tag = AST_ST_CONSTDEF;
@@ -101,8 +102,9 @@ Stmt
 		$$ = std::move(tmp);
 	}
 	| BType VarDefs ';' {
+		auto shared = SharedAST($1);
 		for(auto it = dynamic_cast<StmtVarDef*>($2); it != nullptr; it = dynamic_cast<StmtVarDef*>(it->next.get()) ) {
-			it->type = PtrAST($1);
+			it->type = shared;
 		}
 		auto tmp = new Stmt;
 		tmp->tag = AST_ST_VARDEF;

@@ -78,6 +78,7 @@ public:
 };
 
 using PtrAST = std::unique_ptr<BaseAST>;
+using SharedAST = std::shared_ptr<BaseAST>;
 
 class CompUnit: public BaseAST {
 public:
@@ -112,6 +113,7 @@ public:
 		return tmp; 
 	}
 };
+
 
 class FuncType: public BaseAST {
 public:
@@ -310,7 +312,8 @@ public:
 class StmtVarDef: public BaseAST {
 public:
 	std::string name;
-	PtrAST type, expr, next;	// if uninitialized, expr is nullptr
+	SharedAST type;
+	PtrAST expr, next;	// if uninitialized, expr is nullptr
 	void Dump(std::ostream &out) const override {
 		if(expr == nullptr) out << "StmtVarDef { " << *type << ", " << name << ", " << "[NOTHING]" << " }";
 		else out << "StmtVarDef { " << *type << ", " << name << ", " << *expr << " }";
@@ -325,14 +328,14 @@ public:
 		tmp->symdef.name = new std::string("@" + name);
 		tmp->symdef.alloc = dynamic_cast<TypeInfo*>(type -> DumpMIR(nullptr).mir);
 		buf -> emplace_back(tmp);
-		
+
 		tmp = new StmtInfo;
 		tmp->tag = ST_STORE;
 		tmp->store.isValue = true;
 		tmp->store.val = genValue(res);
 		tmp->store.addr = new std::string("@" + name);
 		buf -> emplace_back(tmp);
-		
+
 		if(next) next->DumpMIR(buf);
 		return MIRRet();
 	}
@@ -341,13 +344,16 @@ public:
 class StmtConstDef: public BaseAST {
 public:
 	std::string name;
-	PtrAST type, expr, next;
+	SharedAST type;
+	PtrAST expr, next;
 	void Dump(std::ostream &out) const override {
 		out << "StmtConstDef { " << *type << ", " << name << ", " << *expr << " }";
 		if(next != nullptr) out << ", " << *next;
 	}
 	MIRRet DumpMIR(std::vector<MIRInfo*> *) const override {
 		constVals[name] = expr -> Calc();
+		// TODO: check if type is matched with the result of expr
+		if(next != nullptr) next->DumpMIR(nullptr);
 		return MIRRet();
 	}
 };

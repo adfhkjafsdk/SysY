@@ -71,7 +71,10 @@ int main(int argc, char *argv[]) {
 	else if(!strcmp(mode, "-riscv")) {
 		ProgramToASM(fout, prog);
 	}
+	// std::cerr << "IR generated!\n";
 	delete prog;
+	// std::cerr << "prog deleted\n";
+	
 	// clean ast
 	return 0;
 }

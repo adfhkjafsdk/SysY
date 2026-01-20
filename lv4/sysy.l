@@ -27,7 +27,7 @@ Hexadecimal 0[xX][0-9A-Fa-f]+
 
 %%
 
-{WhiteSpace}	{ /* Ignore */ }
+{WhiteSpace}	{ /* Ignore */(void)yyinput; (void)yyunput; }
 {LineComment}	{ /* Ignore */ derr << "LineComment " << yytext <<'\n' ;}
 {BlockComment}	{ /* Ignore */ derr << "BlockComment " << yytext <<'\n' ;}
 "int"			{ derr << "INT " << yytext <<'\n'; return INT;}
