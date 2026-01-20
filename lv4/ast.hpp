@@ -17,7 +17,7 @@ static int cntTmp = 0;
 
 static std::string GetTmp() {
 	++cntTmp;
-	std::cerr << "GetTmp " << "%" + std::to_string(cntTmp) << '\n';
+	// std::cerr << "GetTmp " << "%" + std::to_string(cntTmp) << '\n';
 	return "%" + std::to_string(cntTmp);
 }
 
