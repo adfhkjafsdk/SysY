@@ -320,7 +320,6 @@ public:
 		if(next != nullptr) out << ", " << *next;
 	}
 	MIRRet DumpMIR(std::vector<MIRInfo*> *buf) const override {
-		auto res = expr->DumpMIR(buf);
 		// TODO: Check if the type are matched. If not, report the error.
 		auto tmp = new StmtInfo;
 		tmp->tag = ST_SYMDEF;
@@ -328,13 +327,16 @@ public:
 		tmp->symdef.name = new std::string("@" + name);
 		tmp->symdef.alloc = dynamic_cast<TypeInfo*>(type -> DumpMIR(nullptr).mir);
 		buf -> emplace_back(tmp);
-
-		tmp = new StmtInfo;
-		tmp->tag = ST_STORE;
-		tmp->store.isValue = true;
-		tmp->store.val = genValue(res);
-		tmp->store.addr = new std::string("@" + name);
-		buf -> emplace_back(tmp);
+		
+		if(expr != nullptr){
+			auto res = expr->DumpMIR(buf);
+			tmp = new StmtInfo;
+			tmp->tag = ST_STORE;
+			tmp->store.isValue = true;
+			tmp->store.val = genValue(res);
+			tmp->store.addr = new std::string("@" + name);
+			buf -> emplace_back(tmp);
+		}
 
 		if(next) next->DumpMIR(buf);
 		return MIRRet();

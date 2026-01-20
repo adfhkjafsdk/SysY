@@ -12,8 +12,7 @@ int main() {
 	// return N + 30 + !N;
 	int hello = N+30;
 	hello = hello + 100 + 2*M;
-	int qwerty = hello * hello;
-	int tmp;
+	int tmp, qwerty = hello * hello, tmp_2;
 	return 0;
 	// return hello;
 	// return hello == 20231 && qwerty/hello == hello;
