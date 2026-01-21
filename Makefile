@@ -4,7 +4,7 @@
 # autotest requirements:
 #	The main target file should be named 'compiler' and located in the $(BUILD_DIR) directory.
 
-SRC := lv4
+SRC := lv5
 FLEX := flex
 BISON := bison
 CPP := clang++
@@ -38,7 +38,8 @@ $(BUILD_DIR)/sysy.lex.cpp: $(BUILD_DIR) $(SRC)/sysy.l $(SRC)/sysy.y
 	$(FLEX) -o $(BUILD_DIR)/sysy.lex.cpp $(SRC)/sysy.l
 
 $(BUILD_DIR)/sysy.tab.cpp: $(BUILD_DIR) $(SRC)/sysy.y
-	$(BISON) -d -o $(BUILD_DIR)/sysy.tab.cpp $(SRC)/sysy.y
+	$(BISON) -d -o $(BUILD_DIR)/sysy.tab.cpp $(SRC)/sysy.y 
+# -Wcounterexamples
 
 headers: $(BUILD_DIR)/debug.hpp $(BUILD_DIR)/ast.hpp $(BUILD_DIR)/sysy_exceptions.hpp $(BUILD_DIR)/mir.hpp
 

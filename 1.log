@@ -1,0 +1,30 @@
+lv5/sysy.y: warning: 1 shift/reduce conflict [-Wconflicts-sr]
+lv5/sysy.y: warning: shift/reduce conflict on token '=' [-Wcounterexamples]
+  First example: FuncType IDENT '(' '{' LVal • '=' Exp ';' Stmts '}' Block $end
+  Shift derivation
+    $accept
+    ↳ 0: CompUnit                                                                            $end
+         ↳ 1: FuncDef
+              ↳ 2: FuncType IDENT '(' Block                                            Block
+                                      ↳ 4: '{' Stmts                               '}'
+                                               ↳ 6: Stmt                     Stmts
+                                                    ↳ 11: LVal • '=' Exp ';'
+  Second example: FuncType IDENT '(' ')' '{' LVal • '=' '=' RelExp ';' Stmts '}' $end
+  Reduce derivation
+    $accept
+    ↳ 0: CompUnit                                                                                                                                            $end
+         ↳ 1: FuncDef
+              ↳ 2: FuncType IDENT '(' ')' Block
+                                          ↳ 4: '{' Stmts                                                                                                 '}'
+                                                   ↳ 6: Stmt                                                                                       Stmts
+                                                        ↳ 9: Exp                                                                               ';'
+                                                             ↳ 27: LOrExp
+                                                                   ↳ 52: LAndExp
+                                                                         ↳ 50: EqExp
+                                                                               ↳ 48: EqExp                                      '=' '=' RelExp
+                                                                                     ↳ 47: RelExp
+                                                                                           ↳ 42: AddExp
+                                                                                                 ↳ 39: MulExp
+                                                                                                       ↳ 35: UnaryExp
+                                                                                                             ↳ 31: PrimaryExp
+                                                                                                                   ↳ 29: LVal •
