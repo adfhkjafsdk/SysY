@@ -13,6 +13,16 @@
 
 using std::operator""s;
 
+struct MIRRet {
+	MIRInfo *mir;
+	bool isImm;
+	std::string res;
+	int imm;
+	MIRRet(MIRInfo *mir = nullptr): mir{mir}, isImm{true}, res{""}, imm{0} {}
+	MIRRet(MIRInfo *mir, const std::string &res): mir{mir}, isImm{false}, res{res}, imm{0} {}
+	MIRRet(MIRInfo *mir, int imm): mir{mir}, isImm{true}, res{""}, imm{imm} {}
+};
+
 static int cntTmp = 0;
 
 static std::string GetTmp() {
@@ -40,17 +50,51 @@ struct TypeVal {	// unused
 	int val;
 };
 
-static std::map<std::string, int> constVals;
-
-struct MIRRet {
-	MIRInfo *mir;
-	bool isImm;
-	std::string res;
-	int imm;
-	MIRRet(MIRInfo *mir = nullptr): mir{mir}, isImm{true}, res{""}, imm{0} {}
-	MIRRet(MIRInfo *mir, const std::string &res): mir{mir}, isImm{false}, res{res}, imm{0} {}
-	MIRRet(MIRInfo *mir, int imm): mir{mir}, isImm{true}, res{""}, imm{imm} {}
+struct DomainManager {
+	// std::size_t depth;		// current block depth
+	std::vector< std::map<std::string, std::size_t > > recVar;
+	std::vector< std::map<std::string, int > > recConst;
+	std::map<std::string, std::size_t> cnt;
+	DomainManager() {
+		recVar.emplace_back();
+		recConst.emplace_back();
+	}
+	std::string newVar(const std::string &name) {
+		std::cerr << "newName " << name << '\n'; 
+		std::size_t id = cnt[name];
+		recVar.back().emplace(name, id);
+		++ cnt[name];
+		return "@" + name + "_" + std::to_string(id);
+	}
+	void newConst(const std::string &name, int imm) {
+		recConst.back().emplace(name, imm);
+	}
+	MIRRet find(const std::string &name) {
+		for(int i = (int)recVar.size() - 1; i >= 0; -- i) {
+			auto it = recVar[i].find(name);
+			if(it != recVar[i].end()) 
+				return MIRRet(nullptr, "@" + name + "_" + std::to_string(it->second));
+			auto it2 = recConst[i].find(name);
+			if(it2 != recConst[i].end())
+				return MIRRet(nullptr, it2->second);
+		}
+		assert(0);
+		return MIRRet();
+		// return newName(name);
+	}
+	void push() { 
+		recVar.emplace_back();
+		recConst.emplace_back();
+	}
+	void pop() {
+		recVar.pop_back();
+		recConst.pop_back();
+	}
 };
+
+static DomainManager domainMgr;
+
+// static std::map<std::string, int> constVals;
 
 static auto genValue = [](const MIRRet &src) {
 	// std::cerr << "will genValue {" << std::boolalpha << src.isImm <<", " << src.res << ", " << src.imm << " }\n";
@@ -153,17 +197,27 @@ public:
 		if(stmt != nullptr) out << *stmt;
 		out << " }";
 	}
-	MIRRet DumpMIR(std::vector<MIRInfo*>*) const override {
+	MIRRet DumpMIR(std::vector<MIRInfo*> *buf) const override {
+		std::cerr << "Block DumpMIR\n";
 		std::vector<MIRInfo*> statements;
-		auto tmp = new BlockInfo;
-		tmp -> name = "%entry";
+		domainMgr.push();
 		if(stmt != nullptr) {
 			stmt -> DumpMIR(&statements);
 		}
-		tmp -> stmt .init(statements.size());
-		for(std::size_t i = 0; i < statements.size(); ++ i)
-			tmp -> stmt[i] = dynamic_cast<StmtInfo*>(statements[i]);
-		return tmp;
+		domainMgr.pop();
+		if(buf == nullptr) {
+			auto tmp = new BlockInfo;
+			tmp -> name = "%entry";
+			tmp -> stmt .init(statements.size());
+			for(std::size_t i = 0; i < statements.size(); ++ i)
+				tmp -> stmt[i] = dynamic_cast<StmtInfo*>(statements[i]);
+			return tmp;
+		}
+		else {
+			for(auto inner: statements)
+				buf -> emplace_back(inner);
+			return MIRRet();
+		}
 	}
 };
 
@@ -203,12 +257,6 @@ public:
 		auto crt = GetTmp();
 		if(IsUnaryOperator(op)) {
 			auto mirLeft = left -> DumpMIR(buf);
-			// if(op == OP_POS) {
-			// 	tmp->op = OP_ADD;
-			// 	tmp->left = new ValueInfo(0);
-			// 	tmp->right = genValue(mirLeft);
-			// }
-			// else
 			if(op == OP_NEG) {
 				tmp->op = OP_SUB;
 				tmp->left = new ValueInfo(0);
@@ -273,21 +321,19 @@ public:
 		out << "LVal { " << ident << " }";
 	}
 	int Calc() const override {
-		assert(constVals.find(ident) != constVals.end());
-		// std::cerr << "Calc const " << ident << " = " << constVals[ident] << '\n';
-		return constVals[ident];
+		auto found = domainMgr.find(ident);
+		assert(found.isImm);
+		return found.imm;
 	}
 	MIRRet DumpMIR(std::vector<MIRInfo*> *buf) const override {
-		auto it = constVals.find(ident);
-		if(it != constVals.end())
-			return MIRRet(nullptr, it->second);
+		auto found = domainMgr.find(ident);
+		if(found.isImm) return found;
 		else {
-			// assert(0);
 			auto tmp = new StmtInfo;
 			tmp->tag = ST_SYMDEF;
 			tmp->symdef.tag = SDT_LOAD;
 			tmp->symdef.name = new std::string(GetTmp());
-			tmp->symdef.load = new std::string("@" + ident);
+			tmp->symdef.load = new std::string(found.res);
 			buf -> emplace_back(tmp);
 			return MIRRet(nullptr, *tmp->symdef.name);
 		}
@@ -308,8 +354,10 @@ public:
 		if(next != nullptr) out << ", " << *next;
 	}
 	MIRRet DumpMIR(std::vector<MIRInfo*> *buf) const override {
-		detail->DumpMIR(buf);
-		if(next) next->DumpMIR(buf);
+		if(detail != nullptr) {	
+			detail->DumpMIR(buf);
+		}
+		if(next != nullptr) next->DumpMIR(buf);
 		return MIRRet();
 	}
 };
@@ -326,10 +374,11 @@ public:
 	}
 	MIRRet DumpMIR(std::vector<MIRInfo*> *buf) const override {
 		// TODO: Check if the type are matched. If not, report the error.
+		auto varName = domainMgr.newVar(name);
 		auto tmp = new StmtInfo;
 		tmp->tag = ST_SYMDEF;
 		tmp->symdef.tag = SDT_ALLOC;
-		tmp->symdef.name = new std::string("@" + name);
+		tmp->symdef.name = new std::string(varName);
 		tmp->symdef.alloc = dynamic_cast<TypeInfo*>(type -> DumpMIR(nullptr).mir);
 		buf -> emplace_back(tmp);
 		
@@ -339,7 +388,7 @@ public:
 			tmp->tag = ST_STORE;
 			tmp->store.isValue = true;
 			tmp->store.val = genValue(res);
-			tmp->store.addr = new std::string("@" + name);
+			tmp->store.addr = new std::string(varName);
 			buf -> emplace_back(tmp);
 		}
 
@@ -358,7 +407,7 @@ public:
 		if(next != nullptr) out << ", " << *next;
 	}
 	MIRRet DumpMIR(std::vector<MIRInfo*> *) const override {
-		constVals[name] = expr -> Calc();
+		domainMgr.newConst(name, expr -> Calc());
 		// TODO: check if type is matched with the result of expr
 		if(next != nullptr) next->DumpMIR(nullptr);
 		return MIRRet();
@@ -374,10 +423,11 @@ public:
 	MIRRet DumpMIR(std::vector<MIRInfo*> *buf) const override {
 		auto res = expr->DumpMIR(buf);
 		auto tmp = new StmtInfo;
+		assert( ! domainMgr.find(dynamic_cast<LVal*>(lval.get()) -> ident).isImm );
 		tmp -> tag = ST_STORE;
 		tmp -> store.isValue = true;
 		tmp -> store.val = genValue(res);
-		tmp -> store.addr = new std::string("@" + dynamic_cast<LVal*>(lval.get()) -> ident);
+		tmp -> store.addr = new std::string(domainMgr.find(dynamic_cast<LVal*>(lval.get()) -> ident).res);
 		buf -> emplace_back(tmp);
 		return MIRRet();
 	}

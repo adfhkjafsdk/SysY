@@ -52,7 +52,7 @@ int main(int argc, char *argv[]) {
 
 	std::cerr << *ast << std::endl;
 
-	return 0;
+	// return 0;
 
 	std::ofstream fout(output, std::ios::out);
 	
@@ -67,11 +67,12 @@ int main(int argc, char *argv[]) {
 	
 	if(!strcmp(mode, "-koopa")) {
 		ProgramToIR(fout, prog);
+		std::cerr << "IR generated!\n";
 	}
 	else if(!strcmp(mode, "-riscv")) {
 		ProgramToASM(fout, prog);
+		std::cerr << "ASM generated!\n";
 	}
-	// std::cerr << "IR generated!\n";
 	delete prog;
 	// std::cerr << "prog deleted\n";
 	

@@ -37,6 +37,8 @@ Hexadecimal 0[xX][0-9A-Fa-f]+
 {Decimal}		{ derr << "DEC " << yytext <<'\n' ; yylval.int_val = std::strtol(yytext, nullptr, 0); return INT_CONST;  }
 {Octal}			{ derr << "OCT " << yytext <<'\n' ; yylval.int_val = std::strtol(yytext, nullptr, 0); return INT_CONST;  }
 {Hexadecimal}	{ derr << "HEX " << yytext <<'\n' ; yylval.int_val = std::strtol(yytext, nullptr, 0); return INT_CONST; }
+"=="			{ derr << "EQ " << yytext << '\n' ;  return SYM_EQ; }
+"!="			{ derr << "NEQ " << yytext << '\n' ;  return SYM_NEQ; }
 .				{ derr << "SYMBOL " << yytext[0] << '\n'; return yytext[0]; }
 
 %%

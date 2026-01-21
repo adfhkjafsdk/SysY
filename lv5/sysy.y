@@ -31,7 +31,7 @@ void yyerror(ASTree &ast, const char *s);
 
 // lexer 返回的所有 token 种类的声明
 // 注意 IDENT 和 INT_CONST 会返回 token 的值, 分别对应 str_val 和 int_val
-%token INT CONST RETURN
+%token INT CONST RETURN SYM_EQ SYM_NEQ
 %token <str_val> IDENT
 %token <int_val> INT_CONST
 
@@ -293,8 +293,8 @@ RelExp
 
 EqExp
 	: RelExp { $$ = std::move($1); }
-	| EqExp '=' '=' RelExp { $$ = new Expr(OP_EQ, std::move($1), std::move($4)); }
-	| EqExp '!' '=' RelExp { $$ = new Expr(OP_NEQ, std::move($1), std::move($4)); }
+	| EqExp SYM_EQ RelExp  { $$ = new Expr(OP_EQ, std::move($1), std::move($3)); }
+	| EqExp SYM_NEQ RelExp { $$ = new Expr(OP_NEQ, std::move($1), std::move($3)); }
 	;
 
 LAndExp
