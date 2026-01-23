@@ -14,5 +14,6 @@ int main() {
 		else
 			if(6 == 6)
  	 			x = 20;
+	else a=100;
 	return a + x;
 }

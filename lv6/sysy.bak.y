@@ -74,35 +74,18 @@ FuncType
 
 Block
 	: '{' Stmts '}' {
-		Block *raw = dynamic_cast<Block*>($2),
-			  *tmp = new Block;
-		StmtIf* stmtLastIf = nullptr;
-		for(std::size_t i = 0; i < raw->stmt.size(); ++ i) {
-			auto stmtThis = dynamic_cast<Stmt*>(raw->stmt[i].release());
-			if(stmtThis->tag == AST_ST_ELSE) {
-				assert(stmtLastIf != nullptr);
-				bool success = stmtLastIf->tryMatch(stmtThis);
-				assert(success);
-			}
-			else{
-				tmp->stmt.emplace_back(PtrAST(stmtThis));
-				if(stmtThis -> tag == AST_ST_IF) stmtLastIf = dynamic_cast<StmtIf*>(stmtThis->detail.get());
-				else stmtLastIf = nullptr;
-			}
-		}
+		auto tmp = new Block;
+		tmp->isNew = true;
+		tmp->stmt = PtrAST($2);
 		$$ = std::move(tmp);
 	}
 	;
 
 Stmts
-	: {
-		Block *tmp = new Block;
-		tmp->stmt = std::vector<PtrAST>();
-		$$ = std::move(tmp);
-	}
-	| Stmts Stmt {
-		Block *tmp = dynamic_cast<Block*>($1);
-		tmp->stmt.emplace_back(PtrAST($2));
+	: { $$ = nullptr; }
+	| Stmt Stmts {
+		auto tmp = dynamic_cast<Stmt*>($1);
+		tmp->next = PtrAST($2);
 		$$ = std::move(tmp);
 	}
 	;

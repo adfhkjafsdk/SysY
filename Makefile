@@ -31,8 +31,8 @@ all: $(BUILD_DIR)/compiler
 	cp $(BUILD_DIR)/compiler .
 	echo "OK"
 
-$(BUILD_DIR)/compiler: headers $(SRC)/main.cpp $(SRC)/asmgen.cpp $(SRC)/irgen.cpp $(BUILD_DIR)/sysy.lex.cpp $(BUILD_DIR)/sysy.tab.cpp
-	$(CPP) $(CPP_FLAGS) -o $(BUILD_DIR)/compiler $(SRC)/main.cpp $(SRC)/asmgen.cpp $(SRC)/irgen.cpp $(BUILD_DIR)/sysy.lex.cpp $(BUILD_DIR)/sysy.tab.cpp 
+$(BUILD_DIR)/compiler: headers $(SRC)/main.cpp $(SRC)/asmgen.cpp $(SRC)/irgen.cpp $(SRC)/ast.cpp $(BUILD_DIR)/sysy.lex.cpp $(BUILD_DIR)/sysy.tab.cpp
+	$(CPP) $(CPP_FLAGS) -o $(BUILD_DIR)/compiler $(SRC)/main.cpp $(SRC)/asmgen.cpp $(SRC)/irgen.cpp $(SRC)/ast.cpp $(BUILD_DIR)/sysy.lex.cpp $(BUILD_DIR)/sysy.tab.cpp 
 
 $(BUILD_DIR)/sysy.lex.cpp: $(BUILD_DIR) $(SRC)/sysy.l $(SRC)/sysy.y
 	$(FLEX) -o $(BUILD_DIR)/sysy.lex.cpp $(SRC)/sysy.l

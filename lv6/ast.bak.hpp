@@ -215,15 +215,11 @@ public:
 
 class Block: public BaseAST {
 public:
-	// bool isNew;
-	// PtrAST stmt;
-	std::vector<PtrAST> stmt;
+	bool isNew;
+	PtrAST stmt;
 	void Dump(std::ostream &out) const override {
 		out << "Block { " ;
-		for(std::size_t i = 0; i < stmt.size(); ++ i) {
-			if(i > 0) out << ",";
-			out << *stmt[i];
-		}
+		if(stmt != nullptr) out << *stmt;
 		out << " }";
 	}
 	// void DumpBlocks(std::vector<MIRInfo*> *buf) const override {
@@ -246,8 +242,8 @@ public:
 		// }
 
 		domainMgr.push();
-		for(std::size_t i = 0; i < stmt.size(); ++ i) {
-			stmt[i] -> DumpMIR(buf);
+		if(stmt != nullptr) {
+			stmt -> DumpMIR(buf);
 		}
 		domainMgr.pop();
 		return MIRRet(nullptr, ret);
@@ -374,45 +370,29 @@ public:
 	}
 };
 
-
-class Stmt: public BaseAST {
-public:
-	ASTStmtTag tag;
-	PtrAST detail, next;
-	void Dump(std::ostream &out) const override;
-	MIRRet DumpMIR(std::vector<MIRInfo*> *) const override;
-};
-
+class Stmt;
 class StmtIf: public BaseAST {
 public:
 	PtrAST expr, stmt;
 	PtrAST match;
 	void Dump(std::ostream &out) const override {
-		out << "If { " << *expr << ", " << *stmt;
-		if(match != nullptr) out << ", " << *match;
-		out << " }"; 
+		out << "If { " << *expr << ", " << *stmt << " }"; 
 	}
 	MIRRet DumpMIR(std::vector<MIRInfo*> *) const override {
 		assert(0);
 		return MIRRet();
 	}
-	bool tryMatch(Stmt *stmtElse) {
+	void tryMatch(Stmt *stmtElse) {
 		auto realStmt = dynamic_cast<Stmt*>(stmt.get());
 		bool matched = false;
 		if(realStmt->tag == AST_ST_IF) {
 			auto realStmtIf = dynamic_cast<StmtIf*>(realStmt->detail.get());
 			if(realStmtIf->match == nullptr) {
-				if(realStmtIf->tryMatch(stmtElse))
-					matched = true;
-			}
-		}
-		if(!matched) {
-			if(match == nullptr) {
-				match = PtrAST(stmtElse);
+				realStmtIf->tryMatch(stmtElse);
 				matched = true;
 			}
 		}
-		return matched;
+		if(!matched) match = stmtElse;
 	}
 };
 
@@ -503,6 +483,115 @@ public:
 	}
 };
 
+class Stmt: public BaseAST {
+public:
+	ASTStmtTag tag;
+	PtrAST detail, next;
+	// PtrAST exp;
+	void Dump(std::ostream &out) const override {
+		// out << "Stmt { return " << *exp << " }";
+		out << "Stmt";
+		if(tag == AST_ST_ELSE) out << " (ELSE)";
+		if(detail != nullptr)
+			out << " { " << *detail << " }";
+		else
+			out << " {}";
+		if(next != nullptr) out << ", " << *next;
+	}
+	MIRRet DumpMIR(std::vector<MIRInfo*> *buf) const override {		// Dump Stmt to vector<BlockInfo*>
+		BaseAST *realNext = next.get();
+		auto crtBlock = dynamic_cast<BlockInfo*>(buf->back());
+		std::vector<MIRInfo*> stmtTmp;
+		if(detail != nullptr) {
+			switch(tag) {
+				case AST_ST_ASSIGN:
+				case AST_ST_CONSTDEF:
+				case AST_ST_VARDEF:
+				case AST_ST_EXPR: {
+					detail->DumpMIR(&stmtTmp);
+					crtBlock->stmt.reserve(crtBlock->stmt.size() + stmtTmp.size());
+					for(auto s: stmtTmp)
+						crtBlock->stmt.emplace_back(dynamic_cast<StmtInfo*>(s));
+					break;
+				}
+				case AST_ST_RETURN: {
+					detail->DumpMIR(&stmtTmp);
+					crtBlock->stmt.reserve(crtBlock->stmt.size() + stmtTmp.size());
+					for(auto s: stmtTmp)
+						crtBlock->stmt.emplace_back(dynamic_cast<StmtInfo*>(s));
+					if(realNext != nullptr) {
+						std::cerr << "[Warning] Line(s) after return are ignored.\n";
+						realNext = nullptr;
+					}
+					break;
+				}
+				case AST_ST_BLOCK:
+					detail->DumpMIR(buf);
+					break;
+				case AST_ST_IF: {
+					// std::size_t crt = buf.size() - 1;
+					StmtIf *realDetail = dynamic_cast<StmtIf*>(detail.get());
+					auto cond = realDetail -> expr -> DumpMIR(&stmtTmp).res;
+					crtBlock->stmt.reserve(crtBlock->stmt.size() + stmtTmp.size());
+					for(auto s: stmtTmp)
+						crtBlock->stmt.emplace_back(dynamic_cast<StmtInfo*>(s));
+
+					auto stmtBr = new StmtInfo;
+					stmtBr -> tag = ST_BR;
+					stmtBr -> jump.cond = new std::string(cond);
+
+					BlockInfo *blkThen = new BlockInfo, *blkElse = nullptr;
+					blkThen->name = NewBlock();
+					blkThen->stmt = std::vector<StmtInfo*>();
+					buf->emplace_back(blkThen);
+
+					domainMgr.push();
+					realDetail -> stmt -> DumpMIR(buf);
+					domainMgr.pop();
+					stmtBr -> jump.blkThen = new std::string(blkThen->name);
+					stmtBr -> jump.blkElse = nullptr;
+
+					if(next != nullptr && dynamic_cast<Stmt*>(realNext)->tag == AST_ST_ELSE) {
+						blkElse = new BlockInfo;
+						blkElse->name = NewBlock();
+						blkElse->stmt = std::vector<StmtInfo*>();
+						buf->emplace_back(blkElse);
+						
+						domainMgr.push();
+						dynamic_cast<Stmt*>(realNext) -> detail -> DumpMIR(buf);
+						domainMgr.pop();
+						stmtBr -> jump.blkElse = new std::string(blkElse->name);
+						realNext = dynamic_cast<Stmt*>(realNext) -> next.get();
+					}	// TODO: test this!
+					crtBlock -> stmt.emplace_back(stmtBr);
+
+					// Create a new block for realNext, and add jump-stmt to blkThen and blkElse // DONE
+					auto blkNext = new BlockInfo;
+					blkNext->name = NewBlock();
+					blkNext->stmt = std::vector<StmtInfo*>();
+					auto genJump = [&]() {
+						auto stmt = new StmtInfo;
+						stmt->tag = ST_JUMP;
+						stmt->jump.blkThen = new std::string(blkNext->name);
+						return stmt;
+					};
+					blkThen -> stmt.emplace_back(genJump());
+					if(blkElse != nullptr) blkElse -> stmt.emplace_back(genJump());
+					break;
+
+				}
+				case AST_ST_ELSE: {
+					std::cerr << "\'Else\' without an \'if\'.\n";
+					assert(0);
+					break;
+				}
+			}
+		}
+		if(realNext != nullptr) realNext->DumpMIR(buf);
+		return MIRRet();		// This should return the entry Block name of these statements.	// No, there may be not an entire block
+	}
+};
+
 class Number: public BaseAST {
 public:
 	int val;
@@ -516,7 +605,5 @@ public:
 };
 
 using ASTree = std::unique_ptr<CompUnit>;
-
-
 
 #endif
