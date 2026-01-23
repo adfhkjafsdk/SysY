@@ -8,3 +8,4 @@ compiler
 *.S
 *.koopa
 *.out
+*.log
