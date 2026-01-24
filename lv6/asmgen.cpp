@@ -65,16 +65,17 @@ public:
 	}
 } stackMgr;
 
-static std::map<std::string, std::string> varReg;
+static std::string crtFuncName;
 
-// std::string RegOfVar(const std::string &var) {
-// 	auto it = varReg.find(var);
-// 	if(it == varReg.end()) it = varReg.emplace(var, regMgr.allocate());
-// 	return it->second;
-// }
+static std::map<std::string, std::string> varReg;
 
 static bool isImm12(int val) {
 	return I12_MIN <= val && val <= I12_MAX;
+}
+
+std::string BlockId(const std::string &str) {
+	assert(str.substr(0,6) == "%block");
+	return crtFuncName + "_b" + str.substr(6);
 }
 
 std::size_t SizeOfType(const TypeInfo *type) {
@@ -228,13 +229,26 @@ void StmtToASM(std::ostream &out, StmtInfo *mir) {
 			else {
 				out << "  " << "li a0, " << mir->ret.val->i32 << '\n';
 			}
+			out << "  " << "j " << crtFuncName << "_epilogue\n";
 			// 'ret' should be after the epilogue, so output it in FuncToASM, instead of here
+			break;
+		}
+		case ST_BR: {
+			auto cond = ValueToReg(out, mir->jump.cond);
+			out << "  " << "bnez " << cond << ", " 
+						<< BlockId(*mir->jump.blkThen) << "\n";
+			out << "  " << "j " << BlockId(*mir->jump.blkElse) << '\n';
+			break;
+		}
+		case ST_JUMP: {
+			out << "  " << "j " << BlockId(*mir->jump.blkThen) << '\n';
 			break;
 		}
 	}
 }
 
 void BlockToASM(std::ostream &out, BlockInfo *mir) {
+	out << BlockId(mir->name) << ":\n";
 	for(auto stmt: mir->stmt) {
 		out << "  #";
 		StmtToIR(out, stmt);
@@ -265,6 +279,7 @@ void FuncToASM(std::ostream &out, FuncInfo *mir) {
 		}
 	}
 
+	crtFuncName = mir->name;
 	out << mir->name << ":\n";
 	out << "  # prologue of " << mir->name << '\n';
 	if(isImm12(-int(stackSize))) {
@@ -275,11 +290,11 @@ void FuncToASM(std::ostream &out, FuncInfo *mir) {
 		out << "  add sp, sp, a0\n";
 	}
 	out << '\n';
-	out << "  # body of " << mir->name << '\n';
+	// out << "  # body of " << mir->name << '\n';
 	for(auto block: mir->block) {
 		BlockToASM(out, block);
 	}
-	out << '\n';
+	out << mir->name << "_epilogue:\n";
 	out << "  # epilogue of " << mir->name << '\n';
 	if(isImm12(int(stackSize))) {
 		out << "  addi sp, sp, " << int(stackSize) << '\n';
