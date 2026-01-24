@@ -1,5 +1,22 @@
 #include "ast.hpp"
 
+static BlockInfo *NewBlockInfo() {
+	auto block = new BlockInfo;
+	block -> name = NewBlock();
+	block -> stmt = std::vector<StmtInfo*>();
+	return block;
+}
+static BlockInfo *GetLastBlock(std::vector<MIRInfo*> *buf) {
+	assert(! buf->empty());
+	return dynamic_cast<BlockInfo*>(buf->back());
+}
+static StmtInfo *GenJump(const std::string &name){
+	auto stmtJump = new StmtInfo;
+	stmtJump->tag = ST_JUMP;
+	stmtJump->jump.blkThen = new std::string(name);
+	return stmtJump;
+}
+
 void CompUnit::Dump(std::ostream &out) const {
 	out << "CompUnit { " << *func_def << " }";
 }
@@ -15,9 +32,7 @@ void FuncDef::Dump(std::ostream &out) const {
 	out << "FuncDef { " << *func_type << ", " << ident << ", " << *block << " }";
 }
 MIRRet FuncDef::DumpMIR(std::vector<MIRInfo*>*) const {
-	auto blkEntry = new BlockInfo;
-	blkEntry -> name = NewBlock();
-	blkEntry -> stmt = std::vector<StmtInfo*>();
+	auto blkEntry = NewBlockInfo();
 	
 	std::vector<MIRInfo*> buf(1, blkEntry);
 	block -> DumpMIR(&buf);
@@ -103,64 +118,102 @@ int Expr::Calc() const {
 		case OP_LOR:  return left->Calc() || right->Calc();
 	}
 }
-MIRRet Expr::DumpMIR(std::vector<MIRInfo*> *buf) const {		// Dump Expr to vector<StmtInfo*>
+MIRRet Expr::DumpMIR(std::vector<MIRInfo*> *buf) const {		// Dump Expr to vector<BlockInfo*>
 	if(op == OP_POS) return left->DumpMIR(buf);
-	auto tmp = new ExprInfo;
-	auto crt = GetTmp();
-	if(IsUnaryOperator(op)) {
-		auto mirLeft = left -> DumpMIR(buf);
-		if(op == OP_NEG) {
-			tmp->op = OP_SUB;
-			tmp->left = new ValueInfo(0);
-			tmp->right = genValue(mirLeft);
-		}
-		else if(op == OP_LNOT) {
-			tmp->op = OP_EQ;
-			tmp->left = new ValueInfo(0);
-			tmp->right = genValue(mirLeft);
-		}
-	}
-	else {
-		// auto genToBool
-		auto mirLeft = left->DumpMIR(buf), mirRight = right -> DumpMIR(buf);
-		tmp->op = op;
-		if(op == OP_LAND) {
-			auto tmpLeft = new StmtInfo;
-			tmpLeft->tag = ST_SYMDEF;
-			tmpLeft->symdef.tag = SDT_EXPR;
-			tmpLeft->symdef.name = new std::string(GetTmp());
-			tmpLeft->symdef.expr = new ExprInfo(OP_NEQ, genValue(mirLeft), new ValueInfo(0));
-			buf->emplace_back(tmpLeft);
-			
-			auto tmpRight = new StmtInfo;
-			tmpRight->tag = ST_SYMDEF;
-			tmpRight->symdef.tag = SDT_EXPR;
-			tmpRight->symdef.name = new std::string(GetTmp());
-			tmpRight->symdef.expr = new ExprInfo(OP_NEQ, genValue(mirRight), new ValueInfo(0));
-			buf->emplace_back(tmpRight);
+	std::string crt;
+	
+	if (op == OP_LAND || op == OP_LOR) {
+		auto blkShort = NewBlockInfo();
+		auto blkRight = NewBlockInfo();
+		auto blkEnd = NewBlockInfo();
+		
+		auto mirLeft = left->DumpMIR(buf);
+		
+		auto stmtAlloc = new StmtInfo;
+		stmtAlloc->tag = ST_SYMDEF;
+		stmtAlloc->symdef.tag = SDT_ALLOC;
+		stmtAlloc->symdef.name = new std::string(GetTmp());
+		stmtAlloc->symdef.alloc = new TypeInfo;
+		stmtAlloc->symdef.alloc->tag = TT_INT32;
+		GetLastBlock(buf)->stmt.emplace_back(stmtAlloc);
 
-			tmp->left = new ValueInfo(* tmpLeft->symdef.name);
-			tmp->right = new ValueInfo(* tmpRight->symdef.name);
-		}
-		else {
-			tmp->left = genValue(mirLeft);
-			tmp->right = genValue(mirRight);
-		}
-	}
-	auto symd = new StmtInfo;
-	symd -> tag = ST_SYMDEF;
-	symd -> symdef.tag = SDT_EXPR;
-	symd -> symdef.name = new std::string(crt);
-	symd -> symdef.expr = tmp;
-	buf -> emplace_back(symd);
-	if(op == OP_LOR) {
+		auto stmtShort = new StmtInfo;
+		stmtShort->tag = ST_STORE;
+		stmtShort->store.isValue = true;
+		stmtShort->store.addr = new std::string(*stmtAlloc->symdef.name);
+		stmtShort->store.val = new ValueInfo(op == OP_LOR);
+		blkShort -> stmt.emplace_back(stmtShort);
+
+		auto stmtBr = new StmtInfo;
+		stmtBr->tag = ST_BR;
+		// stmtBr->jump.reversed = (op == OP_LOR);
+		stmtBr->jump.cond = genValue(mirLeft);
+		stmtBr->jump.blkThen = new std::string(blkRight->name);
+		stmtBr->jump.blkElse = new std::string(blkShort->name);
+		if(op == OP_LOR) swap(stmtBr->jump.blkThen, stmtBr->jump.blkElse);
+		GetLastBlock(buf)->stmt.emplace_back(stmtBr);
+
+		buf -> emplace_back(blkShort);
+		buf -> emplace_back(blkRight);
+		auto mirRight = right->DumpMIR(buf);
+		auto blkRightBack = GetLastBlock(buf);
+
+		buf -> emplace_back(blkEnd);
+
 		auto toBool = new StmtInfo;
 		toBool->tag = ST_SYMDEF;
 		toBool->symdef.tag = SDT_EXPR;
 		toBool->symdef.name = new std::string(GetTmp());
-		toBool->symdef.expr = new ExprInfo(OP_NEQ, new ValueInfo(crt), new ValueInfo(0));
-		buf->emplace_back(toBool);
-		crt = *toBool->symdef.name;
+		toBool->symdef.expr = new ExprInfo(OP_NEQ, genValue(mirRight), new ValueInfo(0));
+		blkRightBack -> stmt.emplace_back(toBool);
+
+		auto stmtStore = new StmtInfo;
+		stmtStore->tag = ST_STORE;
+		stmtStore->store.isValue = true;
+		stmtStore->store.addr = new std::string(*stmtAlloc->symdef.name);
+		stmtStore->store.val = new ValueInfo(*toBool->symdef.name);
+		blkRightBack -> stmt.emplace_back(stmtStore);
+
+		blkShort -> stmt.emplace_back(GenJump(blkEnd->name));
+		blkRightBack -> stmt.emplace_back(GenJump(blkEnd->name));
+
+		auto stmtLoad = new StmtInfo;
+		stmtLoad->tag = ST_SYMDEF;
+		stmtLoad->symdef.tag = SDT_LOAD;
+		stmtLoad->symdef.name = new std::string(GetTmp());
+		stmtLoad->symdef.load = new std::string(*stmtAlloc->symdef.name);
+		blkEnd -> stmt.emplace_back(stmtLoad);
+
+		crt = *stmtLoad->symdef.name;
+	}
+	else {
+		auto tmp = new ExprInfo;
+		if(IsUnaryOperator(op)) {
+			auto mirLeft = left -> DumpMIR(buf);
+			if(op == OP_NEG) {
+				tmp->op = OP_SUB;
+				tmp->left = new ValueInfo(0);
+				tmp->right = genValue(mirLeft);
+			}
+			else if(op == OP_LNOT) {
+				tmp->op = OP_EQ;
+				tmp->left = new ValueInfo(0);
+				tmp->right = genValue(mirLeft);
+			}
+		}
+		else {
+			auto mirLeft = left->DumpMIR(buf), mirRight = right -> DumpMIR(buf);
+			tmp->op = op;
+			tmp->left = genValue(mirLeft);
+			tmp->right = genValue(mirRight);
+		}
+		auto symd = new StmtInfo;
+		symd -> tag = ST_SYMDEF;
+		symd -> symdef.tag = SDT_EXPR;
+		symd -> symdef.name = new std::string(GetTmp());
+		symd -> symdef.expr = tmp;
+		GetLastBlock(buf) -> stmt.emplace_back(symd);
+		crt = *symd->symdef.name;
 	}
 	return MIRRet(nullptr, crt);
 }
@@ -182,7 +235,7 @@ MIRRet LVal::DumpMIR(std::vector<MIRInfo*> *buf) const {		// Dump LVal to vector
 		tmp->symdef.tag = SDT_LOAD;
 		tmp->symdef.name = new std::string(GetTmp());
 		tmp->symdef.load = new std::string(found.res);
-		buf -> emplace_back(tmp);
+		GetLastBlock(buf) -> stmt.emplace_back(tmp);
 		return MIRRet(nullptr, *tmp->symdef.name);
 	}
 }
@@ -196,79 +249,53 @@ void Stmt::Dump(std::ostream &out) const {
 		out << " {}";
 }
 MIRRet Stmt::DumpMIR(std::vector<MIRInfo*> *buf) const {		// Dump Stmt to vector<BlockInfo*>
-	auto crtBlock = dynamic_cast<BlockInfo*>(buf->back());
-	std::vector<MIRInfo*> stmtTmp;
 	if(detail != nullptr) {
 		switch(tag) {
 			case AST_ST_ASSIGN:
 			case AST_ST_CONSTDEF:
 			case AST_ST_VARDEF:
 			case AST_ST_EXPR:
-			case AST_ST_RETURN: {
-				detail->DumpMIR(&stmtTmp);
-				crtBlock->stmt.reserve(crtBlock->stmt.size() + stmtTmp.size());
-				for(auto s: stmtTmp)
-					crtBlock->stmt.emplace_back(dynamic_cast<StmtInfo*>(s));
-				break;
-			} 
+			case AST_ST_RETURN:
 			case AST_ST_BLOCK:
+			case AST_ST_ELSE:
 				detail->DumpMIR(buf);
 				break;
 			case AST_ST_IF: {
 				StmtIf *realDetail = dynamic_cast<StmtIf*>(detail.get());
-				auto cond = genValue(realDetail -> expr -> DumpMIR(&stmtTmp));
-				crtBlock->stmt.reserve(crtBlock->stmt.size() + stmtTmp.size());
-				for(auto s: stmtTmp)
-					crtBlock->stmt.emplace_back(dynamic_cast<StmtInfo*>(s));
+				auto cond = genValue(realDetail -> expr -> DumpMIR(buf));
+				auto crtBlock = GetLastBlock(buf);
 
 				auto stmtBr = new StmtInfo;
 				stmtBr -> tag = ST_BR;
 				stmtBr -> jump.cond = cond;
 
-				auto blkNext = new BlockInfo;
-				blkNext->name = NewBlock();
-				blkNext->stmt = std::vector<StmtInfo*>();
+				auto blkNext = NewBlockInfo();
 				
-				auto genJump = [&]() {
-					auto stmt = new StmtInfo;
-					stmt->tag = ST_JUMP;
-					stmt->jump.blkThen = new std::string(blkNext->name);
-					return stmt;
-				};
-
-				BlockInfo *blkThen = new BlockInfo, *blkElse = nullptr;
-				blkThen->name = NewBlock();
-				blkThen->stmt = std::vector<StmtInfo*>();
+				BlockInfo *blkThen = NewBlockInfo(), *blkElse = nullptr;
 				buf->emplace_back(blkThen);
 
 				domainMgr.push();
 				realDetail -> stmt -> DumpMIR(buf);
 				domainMgr.pop();
-				if(! dynamic_cast<BlockInfo*>(buf->back())->closed())
-					dynamic_cast<BlockInfo*>(buf->back()) -> stmt.emplace_back(genJump());
+				if(! GetLastBlock(buf)->closed())
+					GetLastBlock(buf) -> stmt.emplace_back(GenJump(blkNext->name));
 				stmtBr -> jump.blkThen = new std::string(blkThen->name);
 				stmtBr -> jump.blkElse = nullptr;
 
 				if(realDetail->match != nullptr) {
-					blkElse = new BlockInfo;
-					blkElse->name = NewBlock();
-					blkElse->stmt = std::vector<StmtInfo*>();
+					blkElse = NewBlockInfo();
 					buf->emplace_back(blkElse);
 					
 					domainMgr.push();
 					dynamic_cast<Stmt*>(realDetail->match.get()) -> DumpMIR(buf);
 					domainMgr.pop();
-					if(! dynamic_cast<BlockInfo*>(buf->back())->closed())
-						dynamic_cast<BlockInfo*>(buf->back()) -> stmt.emplace_back(genJump());
+					if(! GetLastBlock(buf)->closed())
+						GetLastBlock(buf) -> stmt.emplace_back(GenJump(blkNext->name));
 					stmtBr -> jump.blkElse = new std::string(blkElse->name);
 				}
 				if(blkElse == nullptr) stmtBr -> jump.blkElse = new std::string(blkNext->name);
 				crtBlock -> stmt.emplace_back(stmtBr);
 				buf -> emplace_back(blkNext);
-				break;
-			}
-			case AST_ST_ELSE: {
-				detail->DumpMIR(buf);
 				break;
 			}
 		}
@@ -279,7 +306,7 @@ MIRRet Stmt::DumpMIR(std::vector<MIRInfo*> *buf) const {		// Dump Stmt to vector
 void StmtIf::Dump(std::ostream &out) const {
 	out << "If { " << *expr << ", " << *stmt;
 	if(match != nullptr) out << ", " << *match;
-	out << " }"; 
+	out << " }";
 }
 MIRRet StmtIf::DumpMIR(std::vector<MIRInfo*> *) const {
 	assert(0);
@@ -323,7 +350,7 @@ MIRRet StmtVarDef::DumpMIR(std::vector<MIRInfo*> *buf) const {
 	tmp->symdef.tag = SDT_ALLOC;
 	tmp->symdef.name = new std::string(varName);
 	tmp->symdef.alloc = dynamic_cast<TypeInfo*>(type -> DumpMIR(nullptr).mir);
-	buf -> emplace_back(tmp);
+	dynamic_cast<BlockInfo*>(buf->back()) -> stmt.emplace_back(tmp);
 	
 	if(expr != nullptr){
 		auto res = expr->DumpMIR(buf);
@@ -332,12 +359,13 @@ MIRRet StmtVarDef::DumpMIR(std::vector<MIRInfo*> *buf) const {
 		tmp->store.isValue = true;
 		tmp->store.val = genValue(res);
 		tmp->store.addr = new std::string(varName);
-		buf -> emplace_back(tmp);
+		dynamic_cast<BlockInfo*>(buf->back()) -> stmt.emplace_back(tmp);
 	}
 
 	if(next) next->DumpMIR(buf);
 	return MIRRet();
 }
+// TOFIX: change all "Dump to vector<StmtInfo*>" to "Dump to vector<BlockInfo*>"
 
 void StmtConstDef::Dump(std::ostream &out) const {
 	out << "StmtConstDef { " << *type << ", " << name << ", " << *expr << " }";
@@ -361,7 +389,7 @@ MIRRet StmtAssign::DumpMIR(std::vector<MIRInfo*> *buf) const {
 	tmp -> store.isValue = true;
 	tmp -> store.val = genValue(res);
 	tmp -> store.addr = new std::string(domainMgr.find(dynamic_cast<LVal*>(lval.get()) -> ident).res);
-	buf -> emplace_back(tmp);
+	dynamic_cast<BlockInfo*>(buf->back()) -> stmt.emplace_back(tmp);
 	return MIRRet();
 }
 
@@ -373,7 +401,7 @@ MIRRet StmtReturn::DumpMIR(std::vector<MIRInfo*> *buf) const {
 	auto tmp = new StmtInfo;
 	tmp -> tag = ST_RETURN;
 	tmp -> ret.val = genValue(expr->DumpMIR(buf));
-	buf -> emplace_back(tmp);
+	dynamic_cast<BlockInfo*>(buf->back()) -> stmt.emplace_back(tmp);
 	return MIRRet();
 }
 

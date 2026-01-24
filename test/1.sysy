@@ -1,44 +1,12 @@
-int main()
-{
-	int a = 2, t = 0, x = 0;
 
-	// A simple if-else
-	if (a) {
-		a = a + 1;
-	}
-	else
-		a = 0;
-
-	// This is illegal in C, but ok in SysY
-	if (1)
-		int a = 5;
-
-	if (0)
-		return 0;
-
-	// if-else if-else
-	if (a == 1)
-		t = 10;
-	else if(a == 2)
-		t = 20;
-	else 
-		t = 30;
-
-	// Complex nested if-else with dangling else
-	if (1 == 1)
-		if (2 == 2)
-			if (3 == 5) {
-				if (5 == 5)
-					x = 10;
-			}
-			else if (6 == 6)
-				x = 20;
-			else
-				x = 100;
-		else
-			x = 200;
-
-	int end = 100 + t;
-	return a + x + end;
-	return 0;
+int main() {
+  int a = 1, b = 0;
+  if (a || b) {
+    b = 1;
+    a = 0;
+  }
+  if (a && b) {
+    return 0;
+  }
+  return 77;
 }

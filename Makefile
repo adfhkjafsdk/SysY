@@ -36,6 +36,7 @@ all: $(BUILD_DIR)/compiler
 # $(BUILD_DIR)/compiler: headers $(SRC)/main.cpp $(SRC)/asmgen.cpp $(SRC)/irgen.cpp $(SRC)/ast.cpp $(BUILD_DIR)/sysy.lex.cpp $(BUILD_DIR)/sysy.tab.cpp
 # 	$(CPP) $(CPP_FLAGS) -o $(BUILD_DIR)/compiler $(SRC)/main.cpp $(SRC)/asmgen.cpp $(SRC)/irgen.cpp $(SRC)/ast.cpp $(BUILD_DIR)/sysy.lex.cpp $(BUILD_DIR)/sysy.tab.cpp 
 
+HEADERS_SRC = $(SRC)/debug.hpp $(SRC)/ast.hpp $(SRC)/sysy_exceptions.hpp $(SRC)/mir.hpp
 HEADERS = $(BUILD_DIR)/debug.hpp $(BUILD_DIR)/ast.hpp $(BUILD_DIR)/sysy_exceptions.hpp $(BUILD_DIR)/mir.hpp
 OBJS := $(BUILD_DIR)/sysy.lex.o $(BUILD_DIR)/sysy.tab.o $(BUILD_DIR)/ast.o $(BUILD_DIR)/irgen.o $(BUILD_DIR)/asmgen.o $(BUILD_DIR)/main.o
 
@@ -48,16 +49,16 @@ $(BUILD_DIR)/sysy.lex.o: $(HEADERS) $(BUILD_DIR)/sysy.lex.cpp $(BUILD_DIR)/sysy.
 $(BUILD_DIR)/sysy.tab.o: $(HEADERS) $(BUILD_DIR)/sysy.tab.cpp $(BUILD_DIR)/sysy.tab.hpp
 	$(CPP) $(CPP_FLAGS) -o $(BUILD_DIR)/sysy.tab.o $(BUILD_DIR)/sysy.tab.cpp
 
-$(BUILD_DIR)/ast.o: $(SRC)/ast.cpp
+$(BUILD_DIR)/ast.o: $(HEADERS_SRC) $(SRC)/ast.cpp
 	$(CPP) $(CPP_FLAGS) -o $(BUILD_DIR)/ast.o $(SRC)/ast.cpp
 
-$(BUILD_DIR)/irgen.o: $(SRC)/irgen.cpp
+$(BUILD_DIR)/irgen.o: $(HEADERS_SRC) $(SRC)/irgen.cpp
 	$(CPP) $(CPP_FLAGS) -o $(BUILD_DIR)/irgen.o $(SRC)/irgen.cpp
 
-$(BUILD_DIR)/asmgen.o: $(SRC)/asmgen.cpp
+$(BUILD_DIR)/asmgen.o: $(HEADERS_SRC) $(SRC)/asmgen.cpp
 	$(CPP) $(CPP_FLAGS) -o $(BUILD_DIR)/asmgen.o $(SRC)/asmgen.cpp
 
-$(BUILD_DIR)/main.o: $(SRC)/main.cpp
+$(BUILD_DIR)/main.o: $(HEADERS_SRC) $(SRC)/main.cpp
 	$(CPP) $(CPP_FLAGS) -o $(BUILD_DIR)/main.o $(SRC)/main.cpp
 
 $(BUILD_DIR)/sysy.lex.cpp: $(SRC)/sysy.l $(SRC)/sysy.y | $(BUILD_DIR)
