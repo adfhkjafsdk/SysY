@@ -34,7 +34,8 @@ static std::string GetTmp() {
 
 static std::string NewBlock() {
 	++ cntBlock;
-	return "block" + std::to_string(cntBlock);
+	std::cerr << "NewBlock " << cntBlock << '\n';
+	return "%block" + std::to_string(cntBlock);
 }
 
 static bool IsUnaryOperator(Operator op) {
@@ -71,7 +72,7 @@ struct DomainManager {
 		recConst.emplace_back();
 	}
 	std::string newVar(const std::string &name) {
-		std::cerr << "newName " << name << '\n'; 
+		std::cerr << "newVar " << name << '\n'; 
 		std::size_t id = cnt[name];
 		recVar.back().emplace(name, id);
 		++ cnt[name];
@@ -139,16 +140,8 @@ using SharedAST = std::shared_ptr<BaseAST>;
 class CompUnit: public BaseAST {
 public:
 	PtrAST func_def;
-	void Dump(std::ostream &out) const override {
-		out << "CompUnit { " << *func_def << " }";
-	}
-	MIRRet DumpMIR(std::vector<MIRInfo*>*) const override {
-		auto tmp = new ProgramInfo;
-		tmp -> vars .init(0);
-		tmp -> funcs .init(1);
-		tmp -> funcs[0] = dynamic_cast<FuncInfo*>(func_def -> DumpMIR(nullptr).mir);
-		return tmp;
-	}
+	void Dump(std::ostream &out) const override;
+	MIRRet DumpMIR(std::vector<MIRInfo*>*) const override;
 };
 
 class FuncDef: public BaseAST {
@@ -156,103 +149,30 @@ public:
 	PtrAST func_type;
 	std::string ident;
 	PtrAST block;
-	void Dump(std::ostream &out) const override {
-		out << "FuncDef { " << *func_type << ", " << ident << ", " << *block << " }";
-	}
-	MIRRet DumpMIR(std::vector<MIRInfo*>*) const override {
-		auto blkEntry = new BlockInfo;
-		blkEntry -> name = NewBlock();
-		blkEntry -> stmt = std::vector<StmtInfo*>();
-		// blkEntry -> stmt = std::vector<StmtInfo*>(1, new StmtInfo);
-		// blkEntry -> stmt[0] -> tag = ST_JUMP;
-		// blkEntry -> stmt[0] -> jump.blkThen = entry;
-		
-		std::vector<MIRInfo*> buf(1, blkEntry);
-		block -> DumpMIR(&buf);
-
-		auto tmp = new FuncInfo;
-		tmp -> ret = dynamic_cast<TypeInfo*>(func_type -> DumpMIR(nullptr).mir);
-		tmp -> name = ident;
-		tmp -> params = std::vector<VarInfo*>();
-		tmp -> block = std::vector<BlockInfo*>(1, blkEntry);
-		tmp -> block.resize(buf.size() + 1);
-		for(std::size_t i = 0; i < buf.size(); ++ i)
-			tmp -> block[i + 1] = dynamic_cast<BlockInfo*>(buf[i]);
-		return tmp;
-	}
+	void Dump(std::ostream &out) const override;
+	MIRRet DumpMIR(std::vector<MIRInfo*>*) const override;
 };
 
 
 class FuncType: public BaseAST {
 public:
 	std::string type;
-	void Dump(std::ostream &out) const override {
-		out << "FuncType { " << type << " }";
-	}
-	MIRRet DumpMIR(std::vector<MIRInfo*>*) const override {
-		auto tmp = new TypeInfo;
-		if(type == "int") {
-			tmp -> tag = TT_INT32;
-		}
-		return tmp; 
-	}
+	void Dump(std::ostream &out) const override;
+	MIRRet DumpMIR(std::vector<MIRInfo*>*) const override;
 };
 
 class BType: public BaseAST {
 public:
 	std::string type;
-	void Dump(std::ostream &out) const override {
-		out << "BType { " << type << " }";
-	}
-	MIRRet DumpMIR(std::vector<MIRInfo*>*) const override {
-		auto tmp = new TypeInfo;
-		if(type == "int") {
-			tmp -> tag = TT_INT32;
-		}
-		return tmp; 
-	}
+	void Dump(std::ostream &out) const override;
+	MIRRet DumpMIR(std::vector<MIRInfo*>*) const override;
 };
 
 class Block: public BaseAST {
 public:
-	// bool isNew;
-	// PtrAST stmt;
 	std::vector<PtrAST> stmt;
-	void Dump(std::ostream &out) const override {
-		out << "Block { " ;
-		for(std::size_t i = 0; i < stmt.size(); ++ i) {
-			if(i > 0) out << ",";
-			out << *stmt[i];
-		}
-		out << " }";
-	}
-	// void DumpBlocks(std::vector<MIRInfo*> *buf) const override {
-	// }
-	MIRRet DumpMIR(std::vector<MIRInfo*> *buf) const override {		// Dump Block to vector<BlockInfo*>
-		// This requires a BlockInfo created before calling.
-
-		assert(buf != nullptr);
-		assert(!buf -> empty());
-		std::string ret = "";
-
-		// If the block is created inside an empty parent block, just inherit it.
-		// if( buf->empty() || ! dynamic_cast<BlockInfo*>(buf->at(0))->stmt.empty() ) {
-		// if(buf->empty()) {
-		// 	auto tmp = new BlockInfo;
-		// 	tmp -> name = NewBlock();
-		// 	tmp -> stmt = std::vector<StmtInfo*>();
-		// 	buf -> emplace_back(tmp);
-		// 	ret = tmp->name;
-		// }
-
-		domainMgr.push();
-		for(std::size_t i = 0; i < stmt.size(); ++ i) {
-			stmt[i] -> DumpMIR(buf);
-		}
-		domainMgr.pop();
-		return MIRRet(nullptr, ret);
-	}
-	void fix();
+	void Dump(std::ostream &out) const override;
+	MIRRet DumpMIR(std::vector<MIRInfo*> *buf) const override;
 };
 
 class Expr: public BaseAST {
@@ -261,117 +181,17 @@ public:
 	PtrAST left, right;
 	Expr() {}
 	Expr(Operator op, BaseAST* &&left, BaseAST* &&right): op{op}, left{left}, right{right} {}
-	void Dump(std::ostream &out) const override {
-		if(IsUnaryOperator(op)) out << OperatorStr(op) << " { " << *left << " }";
-		else out << OperatorStr(op) << " { " << *left << ", " << *right << " }";
-	}
-	int Calc() const override {
-		switch(op) {
-			case OP_POS:  return  left->Calc();
-			case OP_NEG:  return -left->Calc();
-			case OP_LNOT: return !left->Calc();
-			case OP_MUL:  return left->Calc() *  right->Calc();
-			case OP_DIV:  return left->Calc() /  right->Calc();
-			case OP_MOD:  return left->Calc() %  right->Calc();
-			case OP_ADD:  return left->Calc() +  right->Calc();
-			case OP_SUB:  return left->Calc() -  right->Calc();
-			case OP_LE:   return left->Calc() <= right->Calc();
-			case OP_GE:   return left->Calc() >= right->Calc();
-			case OP_LT:   return left->Calc() <  right->Calc();
-			case OP_GT:   return left->Calc() >  right->Calc();
-			case OP_EQ:   return left->Calc() == right->Calc();
-			case OP_NEQ:  return left->Calc() != right->Calc();
-			case OP_LAND: return left->Calc() && right->Calc();
-			case OP_LOR:  return left->Calc() || right->Calc();
-		}
-	}
-	MIRRet DumpMIR(std::vector<MIRInfo*> *buf) const override {		// Dump Expr to vector<StmtInfo*>
-		if(op == OP_POS) return left->DumpMIR(buf);
-		auto tmp = new ExprInfo;
-		auto crt = GetTmp();
-		if(IsUnaryOperator(op)) {
-			auto mirLeft = left -> DumpMIR(buf);
-			if(op == OP_NEG) {
-				tmp->op = OP_SUB;
-				tmp->left = new ValueInfo(0);
-				tmp->right = genValue(mirLeft);
-			}
-			else if(op == OP_LNOT) {
-				tmp->op = OP_EQ;
-				tmp->left = new ValueInfo(0);
-				tmp->right = genValue(mirLeft);
-			}
-		}
-		else {
-			// auto genToBool
-			auto mirLeft = left->DumpMIR(buf), mirRight = right -> DumpMIR(buf);
-			tmp->op = op;
-			if(op == OP_LAND) {
-				auto tmpLeft = new StmtInfo;
-				tmpLeft->tag = ST_SYMDEF;
-				tmpLeft->symdef.tag = SDT_EXPR;
-				tmpLeft->symdef.name = new std::string(GetTmp());
-				tmpLeft->symdef.expr = new ExprInfo(OP_NEQ, genValue(mirLeft), new ValueInfo(0));
-				buf->emplace_back(tmpLeft);
-				
-				auto tmpRight = new StmtInfo;
-				tmpRight->tag = ST_SYMDEF;
-				tmpRight->symdef.tag = SDT_EXPR;
-				tmpRight->symdef.name = new std::string(GetTmp());
-				tmpRight->symdef.expr = new ExprInfo(OP_NEQ, genValue(mirRight), new ValueInfo(0));
-				buf->emplace_back(tmpRight);
-
-				tmp->left = new ValueInfo(* tmpLeft->symdef.name);
-				tmp->right = new ValueInfo(* tmpRight->symdef.name);
-			}
-			else {
-				tmp->left = genValue(mirLeft);
-				tmp->right = genValue(mirRight);
-			}
-		}
-		auto symd = new StmtInfo;
-		symd -> tag = ST_SYMDEF;
-		symd -> symdef.tag = SDT_EXPR;
-		symd -> symdef.name = new std::string(crt);
-		symd -> symdef.expr = tmp;
-		buf -> emplace_back(symd);
-		if(op == OP_LOR) {
-			auto toBool = new StmtInfo;
-			toBool->tag = ST_SYMDEF;
-			toBool->symdef.tag = SDT_EXPR;
-			toBool->symdef.name = new std::string(GetTmp());
-			toBool->symdef.expr = new ExprInfo(OP_NEQ, new ValueInfo(crt), new ValueInfo(0));
-			buf->emplace_back(toBool);
-			crt = *toBool->symdef.name;
-		}
-		return MIRRet(nullptr, crt);
-	}
+	void Dump(std::ostream &out) const override;
+	int Calc() const override;
+	MIRRet DumpMIR(std::vector<MIRInfo*> *buf) const override;
 };
 
 class LVal: public BaseAST {
 public:
 	std::string ident;
-	void Dump(std::ostream &out) const override {
-		out << "LVal { " << ident << " }";
-	}
-	int Calc() const override {
-		auto found = domainMgr.find(ident);
-		assert(found.isImm);
-		return found.imm;
-	}
-	MIRRet DumpMIR(std::vector<MIRInfo*> *buf) const override {		// Dump LVal to vector<StmtInfo*>
-		auto found = domainMgr.find(ident);
-		if(found.isImm) return found;
-		else {
-			auto tmp = new StmtInfo;
-			tmp->tag = ST_SYMDEF;
-			tmp->symdef.tag = SDT_LOAD;
-			tmp->symdef.name = new std::string(GetTmp());
-			tmp->symdef.load = new std::string(found.res);
-			buf -> emplace_back(tmp);
-			return MIRRet(nullptr, *tmp->symdef.name);
-		}
-	}
+	void Dump(std::ostream &out) const override;
+	int Calc() const override;
+	MIRRet DumpMIR(std::vector<MIRInfo*> *buf) const override;
 };
 
 
@@ -387,33 +207,9 @@ class StmtIf: public BaseAST {
 public:
 	PtrAST expr, stmt;
 	PtrAST match;
-	void Dump(std::ostream &out) const override {
-		out << "If { " << *expr << ", " << *stmt;
-		if(match != nullptr) out << ", " << *match;
-		out << " }"; 
-	}
-	MIRRet DumpMIR(std::vector<MIRInfo*> *) const override {
-		assert(0);
-		return MIRRet();
-	}
-	bool tryMatch(Stmt *stmtElse) {
-		auto realStmt = dynamic_cast<Stmt*>(stmt.get());
-		bool matched = false;
-		if(realStmt->tag == AST_ST_IF) {
-			auto realStmtIf = dynamic_cast<StmtIf*>(realStmt->detail.get());
-			if(realStmtIf->match == nullptr) {
-				if(realStmtIf->tryMatch(stmtElse))
-					matched = true;
-			}
-		}
-		if(!matched) {
-			if(match == nullptr) {
-				match = PtrAST(stmtElse);
-				matched = true;
-			}
-		}
-		return matched;
-	}
+	void Dump(std::ostream &out) const override;
+	MIRRet DumpMIR(std::vector<MIRInfo*> *) const override;
+	bool tryMatch(Stmt *stmtElse);
 };
 
 class StmtVarDef: public BaseAST {
@@ -421,34 +217,8 @@ public:
 	std::string name;
 	SharedAST type;
 	PtrAST expr, next;	// if uninitialized, expr is nullptr
-	void Dump(std::ostream &out) const override {
-		if(expr == nullptr) out << "StmtVarDef { " << *type << ", " << name << ", " << "[NOTHING]" << " }";
-		else out << "StmtVarDef { " << *type << ", " << name << ", " << *expr << " }";
-		if(next != nullptr) out << ", " << *next;
-	}
-	MIRRet DumpMIR(std::vector<MIRInfo*> *buf) const override {
-		// TODO: Check if the type are matched. If not, report the error.
-		auto varName = domainMgr.newVar(name);
-		auto tmp = new StmtInfo;
-		tmp->tag = ST_SYMDEF;
-		tmp->symdef.tag = SDT_ALLOC;
-		tmp->symdef.name = new std::string(varName);
-		tmp->symdef.alloc = dynamic_cast<TypeInfo*>(type -> DumpMIR(nullptr).mir);
-		buf -> emplace_back(tmp);
-		
-		if(expr != nullptr){
-			auto res = expr->DumpMIR(buf);
-			tmp = new StmtInfo;
-			tmp->tag = ST_STORE;
-			tmp->store.isValue = true;
-			tmp->store.val = genValue(res);
-			tmp->store.addr = new std::string(varName);
-			buf -> emplace_back(tmp);
-		}
-
-		if(next) next->DumpMIR(buf);
-		return MIRRet();
-	}
+	void Dump(std::ostream &out) const override;
+	MIRRet DumpMIR(std::vector<MIRInfo*> *buf) const override;
 };
 
 class StmtConstDef: public BaseAST {
@@ -456,63 +226,30 @@ public:
 	std::string name;
 	SharedAST type;
 	PtrAST expr, next;
-	void Dump(std::ostream &out) const override {
-		out << "StmtConstDef { " << *type << ", " << name << ", " << *expr << " }";
-		if(next != nullptr) out << ", " << *next;
-	}
-	MIRRet DumpMIR(std::vector<MIRInfo*> *) const override {
-		domainMgr.newConst(name, expr -> Calc());
-		// TODO: check if type is matched with the result of expr
-		if(next != nullptr) next->DumpMIR(nullptr);
-		return MIRRet();
-	}
+	void Dump(std::ostream &out) const override;
+	MIRRet DumpMIR(std::vector<MIRInfo*> *) const override;
 };
 
 class StmtAssign: public BaseAST {
 public:
 	PtrAST lval, expr;
-	void Dump(std::ostream &out) const override {
-		out << "StmtAssign { " << *lval << ", " << *expr << " }";
-	}
-	MIRRet DumpMIR(std::vector<MIRInfo*> *buf) const override {
-		auto res = expr->DumpMIR(buf);
-		auto tmp = new StmtInfo;
-		assert( ! domainMgr.find(dynamic_cast<LVal*>(lval.get()) -> ident).isImm );
-		tmp -> tag = ST_STORE;
-		tmp -> store.isValue = true;
-		tmp -> store.val = genValue(res);
-		tmp -> store.addr = new std::string(domainMgr.find(dynamic_cast<LVal*>(lval.get()) -> ident).res);
-		buf -> emplace_back(tmp);
-		return MIRRet();
-	}
+	void Dump(std::ostream &out) const override;
+	MIRRet DumpMIR(std::vector<MIRInfo*> *buf) const override;
 };
 
 class StmtReturn: public BaseAST {
 public:
 	PtrAST expr;
-	void Dump(std::ostream &out) const override {
-		if(expr != nullptr) out << "StmtReturn { " << *expr << " }";
-		else out << "StmtReturn {}";
-	}
-	MIRRet DumpMIR(std::vector<MIRInfo*> *buf) const override {
-		auto tmp = new StmtInfo;
-		tmp -> tag = ST_RETURN;
-		tmp -> ret.val = genValue(expr->DumpMIR(buf));
-		buf -> emplace_back(tmp);
-		return MIRRet();
-	}
+	void Dump(std::ostream &out) const override;
+	MIRRet DumpMIR(std::vector<MIRInfo*> *buf) const override;
 };
 
 class Number: public BaseAST {
 public:
 	int val;
-	void Dump(std::ostream &out) const override {
-		out << val ;
-	}
-	int Calc() const override { return val; }
-	MIRRet DumpMIR(std::vector<MIRInfo*>*) const override {
-		return MIRRet(nullptr, val);
-	}
+	void Dump(std::ostream &out) const override;
+	int Calc() const override;
+	MIRRet DumpMIR(std::vector<MIRInfo*>*) const override;
 };
 
 using ASTree = std::unique_ptr<CompUnit>;

@@ -79,10 +79,20 @@ void StmtToIR(std::ostream &out, StmtInfo *mir) {
 			if(mir->store.isValue) ValueToIR(out, mir->store.val);
 			else assert(0);
 			out << ", " << *mir->store.addr << '\n';
+			break;
+		case ST_BR:
+			out << "  " << "br ";
+			ValueToIR(out, mir->jump.cond);
+			out << ", " << *mir->jump.blkThen << ", " << *mir->jump.blkElse << '\n';
+			break;
+		case ST_JUMP:
+			out << "  " << "jump " << *mir->jump.blkThen << '\n';
+			break;
 	}
 }
 
 void BlockToIR(std::ostream &out, BlockInfo *mir) {
+	std::cerr << "BlockToIR " << mir->name << '\n';
 	out << mir->name << ":\n";
 	for(auto stmt: mir->stmt) {
 		StmtToIR(out, stmt);
@@ -95,7 +105,9 @@ void FuncToIR(std::ostream &out, FuncInfo *mir) {
 		out << ": " << IRType(mir->ret);
 	}
 	out << " {\n";
+	std::cerr << "block size = " << mir->block.size() << '\n';
 	for(auto block: mir->block) {
+		std::cerr << "BLOCK\n";
 		BlockToIR(out, block);
 	}
 	out << "}\n";

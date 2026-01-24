@@ -157,7 +157,8 @@ struct StmtInfo: public MIRInfo {
 			std::string *addr;
 		} store;
 		struct {
-			std::string *cond, *blkThen, *blkElse;
+			ValueInfo *cond;
+			std::string *blkThen, *blkElse;
 		} jump;
 	};
 	~StmtInfo() override {
