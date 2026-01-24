@@ -34,7 +34,7 @@ static std::string GetTmp() {
 
 static std::string NewBlock() {
 	++ cntBlock;
-	std::cerr << "NewBlock " << cntBlock << '\n';
+	// std::cerr << "NewBlock " << cntBlock << '\n';
 	return "%block" + std::to_string(cntBlock);
 }
 

@@ -200,6 +200,11 @@ struct StmtInfo: public MIRInfo {
 struct BlockInfo: public MIRInfo {
 	std::string name;
 	std::vector<StmtInfo*> stmt;
+	bool closed() const {
+		if(stmt.empty()) return false;
+		auto tag = stmt.back() -> tag;
+		return tag == ST_JUMP || tag == ST_BR || tag == ST_RETURN;
+	}
 	~BlockInfo() override {
 		for(auto i: stmt) delete i;
 	}
@@ -211,6 +216,7 @@ struct FuncInfo: public MIRInfo {
 	std::vector<VarInfo*> params;
 	std::vector<BlockInfo*> block;
 	~FuncInfo() override {
+		if(ret != nullptr) delete ret;
 		for(auto i: params) delete i;
 		for(auto i: block) delete i;
 	}

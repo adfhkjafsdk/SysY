@@ -82,6 +82,7 @@ Block
 			if(stmtThis->tag == AST_ST_ELSE) {
 				assert(stmtLastIf != nullptr);
 				bool success = stmtLastIf->tryMatch(stmtThis);
+				(void)success;
 				assert(success);
 			}
 			else{
@@ -90,6 +91,7 @@ Block
 				else stmtLastIf = nullptr;
 			}
 		}
+		delete raw;
 		$$ = std::move(tmp);
 	}
 	;

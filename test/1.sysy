@@ -13,13 +13,16 @@ int main()
 	if (1)
 		int a = 5;
 
+	if (0)
+		return 0;
+
 	// if-else if-else
 	if (a == 1)
-		t = 100;
+		t = 10;
 	else if(a == 2)
-		t = 200;
+		t = 20;
 	else 
-		t = 300;
+		t = 30;
 
 	// Complex nested if-else with dangling else
 	if (1 == 1)
@@ -35,7 +38,7 @@ int main()
 		else
 			x = 200;
 
-	int end = 100;
+	int end = 100 + t;
 	return a + x + end;
-	// return 0;
+	return 0;
 }

@@ -73,6 +73,7 @@ MIRRet Block::DumpMIR(std::vector<MIRInfo*> *buf) const {		// Dump Block to vect
 	domainMgr.push();
 	for(std::size_t i = 0; i < stmt.size(); ++ i) {
 		stmt[i] -> DumpMIR(buf);
+		if(dynamic_cast<BlockInfo*>(buf->back()) -> closed()) break;
 	}
 	domainMgr.pop();
 	return MIRRet(nullptr, ret);
@@ -243,7 +244,8 @@ MIRRet Stmt::DumpMIR(std::vector<MIRInfo*> *buf) const {		// Dump Stmt to vector
 				domainMgr.push();
 				realDetail -> stmt -> DumpMIR(buf);
 				domainMgr.pop();
-				dynamic_cast<BlockInfo*>(buf->back()) -> stmt.emplace_back(genJump());
+				if(! dynamic_cast<BlockInfo*>(buf->back())->closed())
+					dynamic_cast<BlockInfo*>(buf->back()) -> stmt.emplace_back(genJump());
 				stmtBr -> jump.blkThen = new std::string(blkThen->name);
 				stmtBr -> jump.blkElse = nullptr;
 
@@ -256,7 +258,8 @@ MIRRet Stmt::DumpMIR(std::vector<MIRInfo*> *buf) const {		// Dump Stmt to vector
 					domainMgr.push();
 					dynamic_cast<Stmt*>(realDetail->match.get()) -> DumpMIR(buf);
 					domainMgr.pop();
-					dynamic_cast<BlockInfo*>(buf->back()) -> stmt.emplace_back(genJump());
+					if(! dynamic_cast<BlockInfo*>(buf->back())->closed())
+						dynamic_cast<BlockInfo*>(buf->back()) -> stmt.emplace_back(genJump());
 					stmtBr -> jump.blkElse = new std::string(blkElse->name);
 				}
 				if(blkElse == nullptr) stmtBr -> jump.blkElse = new std::string(blkNext->name);

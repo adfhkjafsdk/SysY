@@ -92,7 +92,6 @@ void StmtToIR(std::ostream &out, StmtInfo *mir) {
 }
 
 void BlockToIR(std::ostream &out, BlockInfo *mir) {
-	std::cerr << "BlockToIR " << mir->name << '\n';
 	out << mir->name << ":\n";
 	for(auto stmt: mir->stmt) {
 		StmtToIR(out, stmt);
@@ -107,7 +106,6 @@ void FuncToIR(std::ostream &out, FuncInfo *mir) {
 	out << " {\n";
 	std::cerr << "block size = " << mir->block.size() << '\n';
 	for(auto block: mir->block) {
-		std::cerr << "BLOCK\n";
 		BlockToIR(out, block);
 	}
 	out << "}\n";
