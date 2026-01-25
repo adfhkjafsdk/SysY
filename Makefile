@@ -4,7 +4,7 @@
 # autotest requirements:
 #	The main target file should be named 'compiler' and located in the $(BUILD_DIR) directory.
 
-SRC := lv6
+SRC := lv7
 FLEX := flex
 BISON := bison
 CPP := clang++

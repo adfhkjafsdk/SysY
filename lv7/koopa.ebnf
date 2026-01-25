@@ -1,0 +1,49 @@
+Type ::= "i32" | ArrayType | PointerType | FunType;
+ArrayType ::= "[" Type "," INT "]";
+PointerType ::= "*" Type;
+FunType ::= "(" [Type {"," Type}] ")" [":" Type];
+
+Value ::= SYMBOL | INT | "undef";
+Initializer ::= INT | "undef" | Aggregate | "zeroinit";
+Aggregate ::= "{" Initializer {"," Initializer} "}";
+
+SymbolDef ::= SYMBOL "=" (MemoryDeclaration | Load | GetPointer | GetElementPointer | BinaryExpr | FunCall);
+GlobalSymbolDef ::= "global" SYMBOL "=" GlobalMemoryDeclaration;
+
+MemoryDeclaration ::= "alloc" Type;
+GlobalMemoryDeclaration ::= "alloc" Type "," Initializer;
+
+Load ::= "load" SYMBOL;
+Store ::= "store" (Value | Initializer) "," SYMBOL;
+
+GetPointer ::= "getptr" SYMBOL "," Value;
+GetElementPointer ::= "getelemptr" SYMBOL "," Value;
+
+BinaryExpr ::= BINARY_OP Value "," Value;
+
+Branch ::= "br" Value "," SYMBOL "," SYMBOL;
+Jump ::= "jump" SYMBOL;
+
+FunCall ::= "call" SYMBOL "(" [Value {"," Value}] ")";
+Return ::= "ret" [Value];
+
+FunDef ::= "fun" SYMBOL "(" [FunParams] ")" [":" Type] "{" FunBody "}";
+FunParams ::= SYMBOL ":" Type {"," SYMBOL ":" Type};
+FunBody ::= {Block};
+Block ::= SYMBOL ":" {Statement} EndStatement;
+Statement ::= SymbolDef | Store | FunCall;
+EndStatement ::= Branch | Jump | Return;
+
+FunDecl ::= "decl" SYMBOL "(" [FunDeclParams] ")" [":" Type];
+FunDeclParams ::= Type {"," Type};
+
+# Below are extended definitions in compatible with SSA form
+Branch ::= "br" Value "," SYMBOL [BlockArgList] "," SYMBOL [BlockArgList];
+Jump ::= "jump" SYMBOL [BlockArgList];
+BlockArgList ::= "(" Value {"," Value} ")";
+
+Block ::= SYMBOL [BlockParamList] ":" {Statement} EndStatement;
+BlockParamList ::= "(" SYMBOL ":" Type {"," SYMBOL ":" Type} ")";
+
+Annotation ::= AnnoPair {";" AnnoPair} [";"];
+AnnoPair ::= AnnoName [":" AnnoValue];
