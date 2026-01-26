@@ -1,9 +1,19 @@
+int add(int a, int b) {
+	return a + b;
+}
+void nop() {
+	int hello = 100;
+	hello + 1;
+}
+int fib(int n) {
+	if(n <= 2)  return 1;
+	return fib(n-1) + fib(n-2);
+}
 int main() {
-  int i = 0;
-  while (i < 10) {
-    i = 9;
-    break;
-    i = i + 1;
-  }
-  return i;
+//   int a = 20, b = 30;
+//   return 0;
+	// return a+b+1;
+	int n = 8;
+	 int s = fib(8);
+  return fib(n) + s;
 }
