@@ -1,23 +1,6 @@
-int add(int a, int b) {
-	return a + b;
-}
-void nop() {
-	int hello = 100;
-	hello + 1;
-}
-int fib(int n) {
-	if(n <= 2)  return 1;
-	return fib(n-1) + fib(n-2);
-}
-int f(){return 1;}
 int main() {
-  int a = 20, b = 30;
-  nop(); nop();
-//   return 0;
-	// return add(a, b) + 1;
-	// return a+b+1;
-	int n = 8;
-	 int s = fib(8);
-  return fib(n) + s + add(a,b);
-	// return f();
+	int a = getint(), b = getint();
+	putint(a + b);
+	putch(0xA);
+	return 0;
 }

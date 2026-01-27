@@ -92,14 +92,31 @@ void CompUnit::Dump(std::ostream &out) const {
 	out << " }";
 }
 MIRRet CompUnit::DumpMIR(std::vector<MIRInfo*>*) const {
+	std::vector<FuncDef*> func_lib = {
+		new FuncDef(new FuncType("int"), "getint", {}),
+		new FuncDef(new FuncType("int"), "getch", {}),
+		// new FuncDef(new FuncType("int"), "getarray", {}),
+		new FuncDef(new FuncType("void"), "putint", {new BType{"int"}}),
+		new FuncDef(new FuncType("void"), "putch", {new BType{"int"}}),
+		// new FuncDef(new FuncType("void"), "putarray", {new BType{"int"}, }),
+		new FuncDef(new FuncType("void"), "starttime", {}),
+		new FuncDef(new FuncType("void"), "stoptime", {})
+	};
+
 	auto tmp = new ProgramInfo;
 	tmp -> vars .init(0);
 	tmp -> funcs .init(func_def.size());
+	for(std::size_t i = 0; i < func_lib.size(); ++ i) {
+		auto func = func_lib[i];
+		funcMgr[func -> ident] = func;
+	}
 	for(std::size_t i = 0; i < func_def.size(); ++ i) {
 		auto func = dynamic_cast<FuncDef*>(func_def[i].get());
 		funcMgr[func -> ident] = func;
 		tmp -> funcs[i] = dynamic_cast<FuncInfo*>(func_def[i] -> DumpMIR(nullptr).mir);
 	}
+
+	for(auto func: func_lib) delete func;
 	return tmp;
 }
 

@@ -234,6 +234,7 @@ void StmtToASM(std::ostream &out, StmtInfo *mir) {
 						else {
 							auto buf = ValueToReg(out, params[i]);
 							out << "  sw " << buf << ", " << (i-8u)*4u << "(sp)\n";
+							regMgr.free(buf);
 						}
 					}
 					out << "  call " << mir->symdef.func.fun -> substr(1) << '\n';
@@ -294,7 +295,7 @@ void BlockToASM(std::ostream &out, BlockInfo *mir) {
 
 void FuncToASM(std::ostream &out, FuncInfo *mir) {
 	std::size_t stackSize = 0, maxParam = 0;
-	bool isLeaf = false;
+	bool isLeaf = true;
 	stackMgr.clear();
 	for(auto block: mir->block) 
 		for(auto stmt: block->stmt) 
@@ -340,7 +341,7 @@ void FuncToASM(std::ostream &out, FuncInfo *mir) {
 	}
 	if(!isLeaf) out << "  sw ra, " << stackMgr.stackAddr["_ra"] << "(sp)\n";
 	out << '\n';
-	// out << "  # body of " << mir->name << '\n';
+
 	for(auto block: mir->block) {
 		BlockToASM(out, block);
 	}
