@@ -54,6 +54,7 @@ public:
 
 class StackManager {
 public:
+	std::size_t size;
 	std::map<std::string, std::size_t> stackAddr;
 	std::size_t getAddr(const std::string &ident) const {
 		auto it = stackAddr.find(ident);
@@ -61,6 +62,7 @@ public:
 		return it -> second;
 	}
 	void clear() {
+		size = 0;
 		stackAddr.clear();
 	}
 } stackMgr;
@@ -88,12 +90,13 @@ std::size_t SizeOfType(const TypeInfo *type) {
 	}
 }
 
-std::string ValueToReg(std::ostream &out, ValueInfo *mir) {
+std::string ValueToReg(std::ostream &out, ValueInfo *mir, std::string target = "") {
+	std::string crt = target;
 	switch(mir->tag) {
 		case VT_INT:
-			if(mir->i32 == 0) return "zero";
+			if(mir->i32 == 0 && crt.empty()) return "zero";
 			else {
-				std::string crt = regMgr.allocate();
+				if(crt.empty()) crt = regMgr.allocate();
 				out << "  li " << crt << ", " << mir->i32 << '\n';
 				return crt;
 			}
@@ -102,8 +105,18 @@ std::string ValueToReg(std::ostream &out, ValueInfo *mir) {
 			auto it = varReg.find(name);
 			if(it != varReg.end()) return it->second;
 			else {
-				std::string crt = regMgr.allocate();
+				if(crt.empty()) crt = regMgr.allocate();
 				if(name[0] == '%') out << "  lw " << crt << ", " << stackMgr.getAddr(name) << "(sp)\n";
+				else if(name.substr(0, 2) == "@p" && name.substr(name.size() - 5) == "_para") {
+					// Parameter initializer
+					std::size_t id = (std::size_t) std::strtol(name.substr(2, name.size() - 7).c_str(), nullptr, 10);
+					if(id < 8u)
+						out << "  mv " << crt << ", " << "a" << id << '\n';
+					else {
+						// TODO: support long address
+						out << "  lw " << crt << ", " << stackMgr.size + (id - 8u) * 4u << "(sp)\n";
+					}
+				}
 				else {
 					out << "  li " << crt << ", " << stackMgr.getAddr(name) << '\n';
 					// TOFIX: this should be the real address
@@ -111,8 +124,13 @@ std::string ValueToReg(std::ostream &out, ValueInfo *mir) {
 				return crt;
 			}
 		}
-		case VT_UNDEF:
-			return "zero";
+		case VT_UNDEF: {
+			if(crt.empty()) return "zero";
+			else {
+				out << "  li " << crt << ", 0\n";
+				return crt;
+			}
+		}
 	}
 }
 
@@ -209,9 +227,19 @@ void StmtToASM(std::ostream &out, StmtInfo *mir) {
 				case SDT_ALLOC:
 					out << "  #  " << "value of " << *mir->symdef.name << " is " << addr <<'\n';
 					break;
-				// case SDT_FUNCALL:
-				// 	out << "";
-				// 	break;
+				case SDT_FUNCALL: {
+					auto &params = *mir->symdef.func.para;
+					for(std::size_t i = 0; i < params.size(); ++ i) {
+						if(i < 8u) ValueToReg(out, params[i], "a" + std::to_string(i));
+						else {
+							auto buf = ValueToReg(out, params[i]);
+							out << "  sw " << buf << ", " << (i-8u)*4u << "(sp)\n";
+						}
+					}
+					out << "  call " << mir->symdef.func.fun -> substr(1) << '\n';
+					out << "  sw " << "a0" << ", " << addr << "(sp)\n";
+					break;
+				}
 			}
 			break;
 		}
@@ -225,12 +253,15 @@ void StmtToASM(std::ostream &out, StmtInfo *mir) {
 			break;
 		}
 		case ST_RETURN: {
-			if(mir->ret.val->tag == VT_SYMBOL) {
-				auto val = ValueToReg(out, mir->ret.val);
-				out << "  " << "mv a0, " << val << '\n';
-			}
-			else {
-				out << "  " << "li a0, " << mir->ret.val->i32 << '\n';
+			if(mir->ret.val != nullptr){
+				if(mir->ret.val->tag == VT_SYMBOL) {
+					auto val = ValueToReg(out, mir->ret.val);
+					out << "  " << "mv a0, " << val << '\n';
+					regMgr.free(val);
+				}
+				else {
+					out << "  " << "li a0, " << mir->ret.val->i32 << '\n';
+				}
 			}
 			out << "  " << "j " << crtFuncName << "_epilogue\n";
 			// 'ret' should be after the epilogue, so output it in FuncToASM, instead of here
@@ -241,6 +272,7 @@ void StmtToASM(std::ostream &out, StmtInfo *mir) {
 			out << "  " << "bnez " << cond << ", " 
 						<< BlockId(*mir->jump.blkThen) << "\n";
 			out << "  " << "j " << BlockId(*mir->jump.blkElse) << '\n';
+			regMgr.free(cond);
 			break;
 		}
 		case ST_JUMP: {
@@ -261,28 +293,42 @@ void BlockToASM(std::ostream &out, BlockInfo *mir) {
 }
 
 void FuncToASM(std::ostream &out, FuncInfo *mir) {
-	std::size_t stackSize = 0;
+	std::size_t stackSize = 0, maxParam = 0;
+	bool isLeaf = false;
 	stackMgr.clear();
-	for(auto block: mir->block) {
-		for(auto stmt: block->stmt) {
+	for(auto block: mir->block) 
+		for(auto stmt: block->stmt) 
+			if(stmt->tag == ST_SYMDEF && stmt->symdef.tag == SDT_FUNCALL) {
+				isLeaf = false;
+				maxParam = std::max(maxParam, stmt->symdef.func.para -> size() );
+			}
+	if(maxParam > 8)
+		stackSize += 4u * (maxParam - 8);
+
+	for(auto block: mir->block) 
+		for(auto stmt: block->stmt) 
 			if(stmt->tag == ST_SYMDEF && stmt->symdef.tag != SDT_ALLOC) {
 				// Stack for results of instruction
 				stackMgr.stackAddr[* stmt->symdef.name] = stackSize;
 				stackSize += 4;
 			}
-		}
-	}
-	for(auto block: mir->block) {
-		for(auto stmt: block->stmt) {
+	for(auto block: mir->block)
+		for(auto stmt: block->stmt)
 			if(stmt->tag == ST_SYMDEF && stmt->symdef.tag == SDT_ALLOC) {
 				// Stack for alloc
 				stackMgr.stackAddr[* stmt->symdef.name] = stackSize;
 				stackSize += SizeOfType(stmt->symdef.alloc);
 			}
-		}
+	if(!isLeaf) {
+		stackMgr.stackAddr["_ra"] = stackSize;
+		stackSize += 4;		// for storing ra
 	}
+	stackSize = ((stackSize + 15) >> 4) << 4;	// aligning
+	stackMgr.size = stackSize;
 
 	crtFuncName = mir->name;
+	out << "  .text\n";
+	out << "  .globl " << crtFuncName << '\n';
 	out << mir->name << ":\n";
 	out << "  # prologue of " << mir->name << '\n';
 	if(isImm12(-int(stackSize))) {
@@ -292,6 +338,7 @@ void FuncToASM(std::ostream &out, FuncInfo *mir) {
 		out << "  li a0, " << -int(stackSize) << '\n';
 		out << "  add sp, sp, a0\n";
 	}
+	if(!isLeaf) out << "  sw ra, " << stackMgr.stackAddr["_ra"] << "(sp)\n";
 	out << '\n';
 	// out << "  # body of " << mir->name << '\n';
 	for(auto block: mir->block) {
@@ -299,6 +346,7 @@ void FuncToASM(std::ostream &out, FuncInfo *mir) {
 	}
 	out << mir->name << "_epilogue:\n";
 	out << "  # epilogue of " << mir->name << '\n';
+	if(!isLeaf) out << "  lw ra, " << stackMgr.stackAddr["_ra"] << "(sp)\n";
 	if(isImm12(int(stackSize))) {
 		out << "  addi sp, sp, " << int(stackSize) << '\n';
 	}
@@ -313,10 +361,6 @@ void FuncToASM(std::ostream &out, FuncInfo *mir) {
 }
 
 void ProgramToASM(std::ostream &out, ProgramInfo *mir) {
-	out << "  .text\n";
-	for(auto func: mir -> funcs) {
-		out << "  .globl " << func->name << '\n';
-	}
 	for(auto func: mir -> funcs) {
 		FuncToASM(out, func);
 	}

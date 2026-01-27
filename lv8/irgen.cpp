@@ -55,7 +55,8 @@ void ExprToIR(std::ostream &out, ExprInfo *mir) {
 void StmtToIR(std::ostream &out, StmtInfo *mir) {
 	switch(mir->tag) {
 		case ST_SYMDEF:
-			out << "  " << *mir->symdef.name << " = ";
+			if(! mir->symdef.name -> empty()) out << "  " << *mir->symdef.name << " = ";
+			else out << "  ";
 			switch(mir->symdef.tag) {
 				case SDT_EXPR:
 					ExprToIR(out, mir->symdef.expr);

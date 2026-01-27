@@ -95,8 +95,11 @@ MIRRet CompUnit::DumpMIR(std::vector<MIRInfo*>*) const {
 	auto tmp = new ProgramInfo;
 	tmp -> vars .init(0);
 	tmp -> funcs .init(func_def.size());
-	for(std::size_t i = 0; i < func_def.size(); ++ i)
+	for(std::size_t i = 0; i < func_def.size(); ++ i) {
+		auto func = dynamic_cast<FuncDef*>(func_def[i].get());
+		funcMgr[func -> ident] = func;
 		tmp -> funcs[i] = dynamic_cast<FuncInfo*>(func_def[i] -> DumpMIR(nullptr).mir);
+	}
 	return tmp;
 }
 
@@ -121,8 +124,8 @@ MIRRet FuncDef::DumpMIR(std::vector<MIRInfo*>*) const {
 	std::vector<MIRInfo*> buf(1, blkEntry);
 	
 	domainMgr.push();
-	for(const auto &ptr: params) {
-		auto para = dynamic_cast<FuncParam*>(ptr.get());
+	for(std::size_t i = 0; i < params.size(); ++ i) {
+		auto para = dynamic_cast<FuncParam*>(params[i].get());
 		domainMgr.newVar(para->name);
 
 		auto stmtDef = new StmtInfo;
@@ -136,7 +139,7 @@ MIRRet FuncDef::DumpMIR(std::vector<MIRInfo*>*) const {
 		stmtInit->tag = ST_STORE;
 		stmtInit->store.isValue = true;
 		stmtInit->store.addr = new std::string(domainMgr.find(para->name).res);
-		stmtInit->store.val = new ValueInfo(domainMgr.find(para->name).res + "_init");
+		stmtInit->store.val = new ValueInfo("@p" + std::to_string(i) + "_para");
 		GetLastBlock(&buf) -> stmt.emplace_back(stmtInit);
 	}
 	block -> DumpMIR(&buf);
@@ -163,7 +166,7 @@ MIRRet FuncDef::DumpMIR(std::vector<MIRInfo*>*) const {
 	for(std::size_t i = 0; i < params.size(); ++ i) {
 		auto var = new VarInfo;
 		auto p =  dynamic_cast<FuncParam*>(params[i].get());
-		var -> name = domainMgr.find(p->name).res + "_init";
+		var -> name = "@p" + std::to_string(i) + "_para";
 		var -> type = dynamic_cast<TypeInfo*>(p -> type -> DumpMIR(nullptr).mir);
 		tmp -> params[i] = var;
 	}
@@ -238,7 +241,10 @@ MIRRet FunCall::DumpMIR(std::vector<MIRInfo*> *buf) const {
 	auto stmt = new StmtInfo;
 	stmt->tag = ST_SYMDEF;
 	stmt->symdef.tag = SDT_FUNCALL;
-	stmt->symdef.name = new std::string(GetTmp());
+	if( dynamic_cast<FuncType*>(funcMgr[func]->func_type.get()) -> type != "void")
+		stmt->symdef.name = new std::string(GetTmp());
+	else
+		stmt->symdef.name = new std::string("");
 	stmt->symdef.func.fun = new std::string("@" + func);
 	stmt->symdef.func.para = new std::vector<ValueInfo*>();
 	for(const auto &p: params) {
