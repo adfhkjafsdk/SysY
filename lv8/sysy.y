@@ -36,7 +36,7 @@ void yyerror(ASTree &ast, const char *s);
 %token <int_val> INT_CONST
 
 // 非终结符类型定义
-%type <ast_val> FuncDef FuncType FuncFParams FuncFParam Block Stmt Stmts
+%type <ast_val> FuncDef FuncFParams FuncFParam Block Stmt Stmts VarDecl ConstDecl
 %type <ast_val> ConstExp Exp PrimaryExp FuncRParams UnaryExp MulExp AddExp RelExp EqExp LAndExp LOrExp
 %type <ast_val> BType InitVal VarDef VarDefs
 %type <ast_val> ConstInitVal ConstDef ConstDefs
@@ -48,16 +48,30 @@ void yyerror(ASTree &ast, const char *s);
 CompUnit
 	: {
 		auto tmp = std::make_unique<CompUnit>();
-		tmp -> func_def = std::vector<PtrAST>();
+		tmp -> glob_def = std::vector<std::pair<ASTGolbTag, PtrAST> >();
 		ast = std::move(tmp);
 	}
+	| CompUnit VarDecl {
+		ast -> glob_def.emplace_back(AST_GT_VAR, PtrAST($2));
+	}
 	| CompUnit FuncDef {
-		ast -> func_def.emplace_back(PtrAST($2));
+		ast -> glob_def.emplace_back(AST_GT_FUNC, PtrAST($2));
+	}
+	| CompUnit ConstDecl {
+		ast -> glob_def.emplace_back(AST_GT_CONST, PtrAST($2));
 	}
 	;
 
 FuncDef
-	: FuncType IDENT '(' FuncFParams ')' Block {
+	: BType IDENT '(' FuncFParams ')' ';' {
+		auto tmp = dynamic_cast<FuncDef*>($4);
+		tmp -> func_type = PtrAST($1);
+		tmp -> ident = *$2;
+		tmp -> block = nullptr;
+		delete $2;
+		$$ = std::move(tmp);
+	}
+	| BType IDENT '(' FuncFParams ')' Block {
 		auto tmp = dynamic_cast<FuncDef*>($4);
 		tmp -> func_type = PtrAST($1);
 		tmp -> ident = *$2;
@@ -67,14 +81,14 @@ FuncDef
 	}
 	;
 
-FuncType
+BType
 	: INT {
-		auto tmp = new FuncType;
+		auto tmp = new BType;
 		tmp -> type = "int";
 		$$ = std::move(tmp);
 	}
 	| VOID {
-		auto tmp = new FuncType;
+		auto tmp = new BType;
 		tmp -> type = "void";
 		$$ = std::move(tmp);
 	}
@@ -146,7 +160,7 @@ Stmts
 	}
 	;
 
-Stmt
+ConstDecl
 	: CONST BType ConstDefs ';' {
 		auto shared = SharedAST($2);
 		for(auto it = dynamic_cast<StmtConstDef*>($3); it != nullptr; it = dynamic_cast<StmtConstDef*>(it->next.get()) ) {
@@ -157,7 +171,10 @@ Stmt
 		tmp->detail = PtrAST($3);
 		$$ = std::move(tmp);
 	}
-	| BType VarDefs ';' {
+	;
+
+VarDecl
+	: BType VarDefs ';' {
 		auto shared = SharedAST($1);
 		for(auto it = dynamic_cast<StmtVarDef*>($2); it != nullptr; it = dynamic_cast<StmtVarDef*>(it->next.get()) ) {
 			it->type = shared;
@@ -167,6 +184,10 @@ Stmt
 		tmp->detail = PtrAST($2);
 		$$ = std::move(tmp);
 	}
+
+Stmt
+	: ConstDecl { $$ = std::move($1); }
+	| VarDecl { $$ = std::move($1); }
 	| Exp ';' {
 		auto tmp = new Stmt;
 		tmp->tag = AST_ST_EXPR;
@@ -246,14 +267,6 @@ Stmt
 		auto tmp = new Stmt;
 		tmp->tag = AST_ST_RETURN;
 		tmp->detail = PtrAST(det);
-		$$ = std::move(tmp);
-	}
-	;
-
-BType
-	: INT { 
-		auto tmp = new BType;
-		tmp -> type = "int";
 		$$ = std::move(tmp);
 	}
 	;

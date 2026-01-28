@@ -45,6 +45,28 @@ void ValueToIR(std::ostream &out, ValueInfo *mir) {
 	else if(mir->tag == VT_SYMBOL) out << *(mir->symbol);
 }
 
+void InitializerToIR(std::ostream &out, InitializerInfo *mir) {
+	switch(mir->tag) {
+		case IT_UNDEF: 
+			out << "undef";
+			break;
+		case IT_NUM:
+			out << mir->num;
+			break;
+		case IT_ZERO:
+			out << "zeroinit";
+			break;
+		case IT_AGGR:
+			out << "{";
+			for(std::size_t i = 0; i < mir->aggr.size(); ++ i) {
+				if(i > 0) out << ", ";
+				InitializerToIR(out, mir->aggr[i]);
+			}
+			out << "}";
+			break;
+	}
+}
+
 void ExprToIR(std::ostream &out, ExprInfo *mir) {
 	out << OperatorIR(mir->op) << " ";
 	ValueToIR(out, mir->left);
@@ -136,6 +158,12 @@ void ProgramToIR(std::ostream &out, ProgramInfo *mir) {
 		<< "decl @putarray(i32, *i32)\n"
 		<< "decl @starttime()\n"
 		<< "decl @stoptime()\n\n";
+
+	for(auto var: mir -> vars) {
+		out << "global " << var->name << " = alloc " << IRType(var->type) << ", ";
+		InitializerToIR(out, var->init);
+		out << '\n';
+	}
 
 	for(auto func: mir -> funcs) {
 		FuncToIR(out, func);

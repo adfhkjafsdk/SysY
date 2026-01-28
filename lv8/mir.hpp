@@ -94,10 +94,18 @@ struct TypeInfo: public MIRInfo {
 	}
 };
 
+struct InitializerInfo: public MIRInfo {
+	InitializerTag tag;
+	int num;
+	std::vector<InitializerInfo*> aggr;
+};
+
 struct VarInfo: public MIRInfo {
 	TypeInfo *type;
 	std::string name;
+	InitializerInfo *init;
 	~ VarInfo() override {
+		if(init != nullptr) delete init;
 		delete type;
 	}
 };
@@ -127,12 +135,6 @@ struct ExprInfo: public MIRInfo {
 		delete left;
 		delete right;
 	}
-};
-
-struct InitializerInfo: public MIRInfo {
-	InitializerTag tag;
-	int num;
-	std::vector<InitializerInfo*> aggr;
 };
 
 struct StmtInfo: public MIRInfo {

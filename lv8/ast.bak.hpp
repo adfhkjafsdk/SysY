@@ -116,6 +116,15 @@ public:
 	MIRRet DumpMIR(std::vector<MIRInfo*>*) const override;
 };
 
+class FuncType: public BaseAST {
+public:
+	std::string type;
+	FuncType() {}
+	FuncType(const std::string &type): type{type} {}
+	void Dump(std::ostream &out) const override;
+	MIRRet DumpMIR(std::vector<MIRInfo*>*) const override;
+};
+
 class BType: public BaseAST {
 public:
 	std::string type;
@@ -131,7 +140,7 @@ public:
 	std::vector<PtrAST> params;
 	PtrAST block;
 	FuncDef() {}
-	FuncDef(BType *type, const std::string &name, const std::vector<BType*> &para) {
+	FuncDef(FuncType *type, const std::string &name, const std::vector<BType*> &para) {
 		func_type = PtrAST(type);
 		ident = name;
 		params.resize(para.size());

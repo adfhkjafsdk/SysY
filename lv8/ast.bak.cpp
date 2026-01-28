@@ -3,7 +3,7 @@
 
 struct DomainManager {
 	struct LayerInfo {
-		std::map<std::string, std::string> recVar;
+		std::map<std::string, std::size_t > recVar;
 		std::map<std::string, int > recConst;
 		std::string blkBreak, blkContinue;
 	};
@@ -15,20 +15,21 @@ struct DomainManager {
 	}
 	std::string newVar(const std::string &name) {
 		std::cerr << "newVar " << name << '\n'; 
-		std::string res = "";
+		std::size_t id = cnt[name];
+		rec.back().recVar.emplace(name, id);
 		if(rec.size() == 1u) {
-			res = "@" + name;
+			std::string res = "@" + name;
+			used.emplace(res);
+			return res;
 		}
-		else {
-			while(true) {
-				++ cnt[name];
-				res = "@" + name + "_" + std::to_string(cnt[name]);
-				if(used.find(res) == used.end()) break;
+		while(true) {
+			++ cnt[name];
+			std::string res = "@" + name + "_" + std::to_string(id);
+			if(used.find(res) == used.end()) {
+				used.emplace(res);
+				return res;
 			}
 		}
-		used.emplace(res);
-		rec.back().recVar.emplace(name, res);
-		return res;
 	}
 	void newConst(const std::string &name, int imm) {
 		rec.back().recConst.emplace(name, imm);
@@ -38,7 +39,7 @@ struct DomainManager {
 		for(int i = (int)rec.size() - 1; i >= 0; -- i) {
 			auto it = rec[i].recVar.find(name);
 			if(it != rec[i].recVar.end()) 
-				return MIRRet(nullptr, it->second);
+				return MIRRet(nullptr, "@" + name + "_" + std::to_string(it->second));
 			auto it2 = rec[i].recConst.find(name);
 			if(it2 != rec[i].recConst.end())
 				return MIRRet(nullptr, it2->second);
@@ -110,20 +111,20 @@ void CompUnit::Dump(std::ostream &out) const {
 	out << "CompUnit { ";
 	for(std::size_t i = 0; i < glob_def.size(); ++ i) {
 		if(i > 0) out << ", ";
-		out << *glob_def[i].second;
+		out << glob_def[i].second;
 	}
 	out << " }";
 }
 MIRRet CompUnit::DumpMIR(std::vector<MIRInfo*>*) const {
 	std::vector<FuncDef*> func_lib = {
-		new FuncDef(new BType("int"), "getint", {}),
-		new FuncDef(new BType("int"), "getch", {}),
-		// new FuncDef(new BType("int"), "getarray", {}),
-		new FuncDef(new BType("void"), "putint", {new BType{"int"}}),
-		new FuncDef(new BType("void"), "putch", {new BType{"int"}}),
-		// new FuncDef(new BType("void"), "putarray", {new BType{"int"}, }),
-		new FuncDef(new BType("void"), "starttime", {}),
-		new FuncDef(new BType("void"), "stoptime", {})
+		new FuncDef(new FuncType("int"), "getint", {}),
+		new FuncDef(new FuncType("int"), "getch", {}),
+		// new FuncDef(new FuncType("int"), "getarray", {}),
+		new FuncDef(new FuncType("void"), "putint", {new BType{"int"}}),
+		new FuncDef(new FuncType("void"), "putch", {new BType{"int"}}),
+		// new FuncDef(new FuncType("void"), "putarray", {new BType{"int"}, }),
+		new FuncDef(new FuncType("void"), "starttime", {}),
+		new FuncDef(new FuncType("void"), "stoptime", {})
 	};
 
 	std::size_t countFunc = 0, countVar = 0;
@@ -132,11 +133,8 @@ MIRRet CompUnit::DumpMIR(std::vector<MIRInfo*>*) const {
 		auto &detail = item.second;
 		if(tag == AST_GT_FUNC) ++ countFunc;
 		else if(tag == AST_GT_VAR)
-			countVar += LinkedSize( dynamic_cast<StmtVarDef*>(
-				dynamic_cast<Stmt*>(detail.get())->detail.get()) );
+			countVar += LinkedSize(dynamic_cast<StmtVarDef*>(detail.get()));
 	}
-
-	std::cerr << "countVar = " << countVar << '\n';
 
 	auto tmp = new ProgramInfo;
 	tmp -> vars .init(countVar);
@@ -166,21 +164,17 @@ MIRRet CompUnit::DumpMIR(std::vector<MIRInfo*>*) const {
 				break;
 			case AST_GT_VAR: {
 				std::vector<StmtVarDef*> stmts;
-				for(auto stmt = dynamic_cast<Stmt*>(detail.get())->detail.get(); stmt != nullptr;) {
+				for(auto stmt = detail.get(); stmt != nullptr;) {
 					auto ptr = dynamic_cast<StmtVarDef*>(stmt);
 					stmts.emplace_back(ptr);
-					if(ptr->next == nullptr) break;
 					stmt = ptr->next.get();
 				}
 				for(auto stmt: stmts) {
 					auto var = new VarInfo;
-					var->name = domainMgr.newVar(stmt->name);
+					var->name = stmt->name;
 					var->type = dynamic_cast<TypeInfo*>(stmt->type->DumpMIR(nullptr).mir);
 					var->init = new InitializerInfo;
-					if(stmt->expr == nullptr) {
-						var->init->tag = IT_ZERO;
-					}
-					else if(stmt->expr->isConst()) {
+					if(stmt->expr->isConst()) {
 						int result = stmt->expr->Calc();
 						if(result == 0) var->init->tag = IT_ZERO;
 						else {
@@ -234,7 +228,7 @@ MIRRet FuncDef::DumpMIR(std::vector<MIRInfo*>*) const {
 		for(auto stmt: globVarsToInit) {
 			auto stmtInit = new StmtInfo;
 			stmtInit->tag = ST_STORE;
-			stmtInit->store.addr = new std::string(domainMgr.find(stmt->name).res);
+			stmtInit->store.addr = new std::string(stmt->name);
 			stmtInit->store.isValue = true;
 			stmtInit->store.val = genValue(stmt->expr->DumpMIR(&buf));
 			GetLastBlock(&buf) -> stmt.emplace_back(stmtInit);
@@ -266,7 +260,7 @@ MIRRet FuncDef::DumpMIR(std::vector<MIRInfo*>*) const {
 		auto stmtRet = new StmtInfo;
 		stmtRet->tag = ST_RETURN;
 		stmtRet->ret.val = nullptr;
-		if(	dynamic_cast<BType*>(func_type.get()) -> type != "void") {
+		if(	dynamic_cast<FuncType*>(func_type.get()) -> type != "void") {
 			std::cerr << "[Warning] Maybe control reaches end of non-void function.\n";
 			stmtRet->ret.val = new ValueInfo(0);
 		}
@@ -292,6 +286,20 @@ MIRRet FuncDef::DumpMIR(std::vector<MIRInfo*>*) const {
 	domainMgr.pop();
 
 	return tmp;
+}
+
+void FuncType::Dump(std::ostream &out) const {
+	out << "FuncType { " << type << " }";
+}
+MIRRet FuncType::DumpMIR(std::vector<MIRInfo*>*) const {
+	auto tmp = new TypeInfo;
+	if(type == "int") {
+		tmp -> tag = TT_INT32;
+	}
+	else if(type == "void") {
+		tmp -> tag = TT_UNIT;
+	}
+	return tmp; 
 }
 
 void BType::Dump(std::ostream &out) const {
@@ -349,7 +357,7 @@ MIRRet FunCall::DumpMIR(std::vector<MIRInfo*> *buf) const {
 	auto stmt = new StmtInfo;
 	stmt->tag = ST_SYMDEF;
 	stmt->symdef.tag = SDT_FUNCALL;
-	if( dynamic_cast<BType*>(funcMgr[func]->func_type.get()) -> type != "void")
+	if( dynamic_cast<FuncType*>(funcMgr[func]->func_type.get()) -> type != "void")
 		stmt->symdef.name = new std::string(GetTmp());
 	else
 		stmt->symdef.name = new std::string("");
