@@ -389,6 +389,7 @@ int Expr::Calc() const {
 		case OP_LAND: return left->Calc() && right->Calc();
 		case OP_LOR:  return left->Calc() || right->Calc();
 	}
+	__builtin_unreachable();
 }
 MIRRet Expr::DumpMIR(std::vector<MIRInfo*> *buf) const {		// Dump Expr to vector<BlockInfo*>
 	if(op == OP_POS) return left->DumpMIR(buf);

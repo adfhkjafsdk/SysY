@@ -37,6 +37,7 @@ std::string IRType(TypeInfo *mir) {
 			}
 			return result;
 	}
+	__builtin_unreachable();
 }
 
 void ValueToIR(std::ostream &out, ValueInfo *mir) {

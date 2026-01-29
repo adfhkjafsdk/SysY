@@ -81,6 +81,7 @@ struct TypeInfo: public MIRInfo {
 			case TT_POINTER:
 			case TT_FUNCTION: return 4;		// 32-bit
 		}
+		__builtin_unreachable();
 	}
 	TypeInfo(){}
 	TypeInfo(TypeTag tag): tag{tag} {}

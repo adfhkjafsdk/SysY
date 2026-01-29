@@ -102,6 +102,7 @@ std::size_t SizeOfType(const TypeInfo *type) {
 		case TT_POINTER: return PTR_SIZE;
 		case TT_FUNCTION: return PTR_SIZE;
 	}
+	__builtin_unreachable();
 }
 
 std::string ValueToReg(std::ostream &out, ValueInfo *mir, std::string target = "") {
@@ -146,6 +147,7 @@ std::string ValueToReg(std::ostream &out, ValueInfo *mir, std::string target = "
 			}
 		}
 	}
+	__builtin_unreachable();
 }
 
 std::string SymdefExprToASM(std::ostream &out, ExprInfo *mir) {
