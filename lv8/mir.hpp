@@ -73,6 +73,15 @@ struct TypeInfo: public MIRInfo {
 			TypeInfo *ret;	// If there's no return, this is UNIT.
 		} function;
 	};
+	std::size_t size() const {
+		switch(tag) {
+			case TT_INT32: return 4;
+			case TT_UNIT: return 0;
+			case TT_ARRAY: return array.len * array.base->size();
+			case TT_POINTER:
+			case TT_FUNCTION: return 4;		// 32-bit
+		}
+	}
 	TypeInfo(){}
 	TypeInfo(TypeTag tag): tag{tag} {}
 	~TypeInfo() override {

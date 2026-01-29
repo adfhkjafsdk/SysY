@@ -52,6 +52,7 @@ public:
 	}
 } regMgr;
 
+static std::set<std::string> globals;
 class StackManager {
 public:
 	std::size_t size;
@@ -68,11 +69,24 @@ public:
 } stackMgr;
 
 static std::string crtFuncName;
+static std::map<std::string, std::size_t> crtParams;
+static FuncInfo *crtFunc;
 
 static std::map<std::string, std::string> varReg;
 
 static bool isImm12(int val) {
 	return I12_MIN <= val && val <= I12_MAX;
+}
+
+static std::string GlobalName(const std::string &str) {
+	std::cerr << "GN " << str << '\n';
+	assert(str[0] == '@');
+	return str.substr(1);
+}
+
+static bool isGlobal(const std::string &koopaIdent) {
+	return  !koopaIdent.empty() && koopaIdent[0] == '@' &&
+			globals.find(GlobalName(koopaIdent)) != globals.end();
 }
 
 std::string BlockId(const std::string &str) {
@@ -106,10 +120,9 @@ std::string ValueToReg(std::ostream &out, ValueInfo *mir, std::string target = "
 			if(it != varReg.end()) return it->second;
 			else {
 				if(crt.empty()) crt = regMgr.allocate();
-				if(name[0] == '%') out << "  lw " << crt << ", " << stackMgr.getAddr(name) << "(sp)\n";
-				else if(name.substr(0, 2) == "@p" && name.substr(name.size() - 5) == "_para") {
-					// Parameter initializer
-					std::size_t id = (std::size_t) std::strtol(name.substr(2, name.size() - 7).c_str(), nullptr, 10);
+				auto it = crtParams.find(name);
+				if(it != crtParams.end()) {
+					std::size_t id = it->second;
 					if(id < 8u)
 						out << "  mv " << crt << ", " << "a" << id << '\n';
 					else {
@@ -117,6 +130,7 @@ std::string ValueToReg(std::ostream &out, ValueInfo *mir, std::string target = "
 						out << "  lw " << crt << ", " << stackMgr.size + (id - 8u) * 4u << "(sp)\n";
 					}
 				}
+				else if(name[0] == '%') out << "  lw " << crt << ", " << stackMgr.getAddr(name) << "(sp)\n";
 				else {
 					out << "  li " << crt << ", " << stackMgr.getAddr(name) << '\n';
 					// TOFIX: this should be the real address
@@ -218,9 +232,17 @@ void StmtToASM(std::ostream &out, StmtInfo *mir) {
 				}
 				case SDT_LOAD: {
 					auto buf = regMgr.allocate();
-					auto addrSrc = stackMgr.getAddr(* mir->symdef.load);
-					out << "  lw " << buf << ", " << addrSrc << "(sp)\n";
-					out << "  sw " << buf << ", " << addr << "(sp)\n";
+					auto name = * mir->symdef.load;
+					if(isGlobal(name)) {
+						out << "  la " << buf << ", " << GlobalName(name) <<'\n';
+						out << "  lw " << buf << ", " << "0(" << buf << ")\n";
+						out << "  sw " << buf << ", " << addr << "(sp)\n";
+					}
+					else {
+						auto addrSrc = stackMgr.getAddr(name);
+						out << "  lw " << buf << ", " << addrSrc << "(sp)\n";
+						out << "  sw " << buf << ", " << addr << "(sp)\n";
+					}
 					regMgr.free(buf);
 					break;
 				}
@@ -237,7 +259,7 @@ void StmtToASM(std::ostream &out, StmtInfo *mir) {
 							regMgr.free(buf);
 						}
 					}
-					out << "  call " << mir->symdef.func.fun -> substr(1) << '\n';
+					out << "  call " << GlobalName(*mir->symdef.func.fun) << '\n';
 					out << "  sw " << "a0" << ", " << addr << "(sp)\n";
 					break;
 				}
@@ -246,10 +268,19 @@ void StmtToASM(std::ostream &out, StmtInfo *mir) {
 		}
 		case ST_STORE: {
 			assert(mir -> store.isValue);
-			std::size_t addr = stackMgr.getAddr(* mir->store.addr);
+			auto name = * mir->store.addr;
 			std::string src = ValueToReg(out, mir->store.val);
-			out << "  sw " << src << ", " << addr << "(sp)\n";
-			// TODO: support long address on every occurance of 'lw' and 'sw'
+			if(isGlobal(name)) {
+				std::string dest = regMgr.allocate();
+				out << "  la " << dest << ", " << GlobalName(name) << "\n";
+				out << "  sw " << src << ", " << 0 << "(" << dest << ")\n";
+				regMgr.free(dest);
+			}
+			else {
+				std::size_t addr = stackMgr.getAddr(name);
+				out << "  sw " << src << ", " << addr << "(sp)\n";
+				// TODO: support long address on every occurance of 'lw' and 'sw'
+			}
 			regMgr.free(src);
 			break;
 		}
@@ -286,6 +317,7 @@ void StmtToASM(std::ostream &out, StmtInfo *mir) {
 void BlockToASM(std::ostream &out, BlockInfo *mir) {
 	out << BlockId(mir->name) << ":\n";
 	for(auto stmt: mir->stmt) {
+		StmtToIR(std::cerr, stmt);
 		out << "  #";
 		StmtToIR(out, stmt);
 		StmtToASM(out, stmt);
@@ -293,7 +325,35 @@ void BlockToASM(std::ostream &out, BlockInfo *mir) {
 	}
 }
 
+void InitializerToASM(std::ostream &out, InitializerInfo *mir, TypeInfo *type) {
+	switch(mir->tag) {
+		case IT_UNDEF:
+		case IT_ZERO:
+			out << "  .zero " << type->size() << '\n';
+			break;
+		case IT_NUM:
+			assert(type->size() == 4u);
+			out << "  .word " << mir->num << '\n';
+			break;
+		case IT_AGGR:
+			break;
+	}
+}
+
+void VarToASM(std::ostream &out, VarInfo *mir) {
+	std::string varName = GlobalName(mir->name);
+	globals.emplace(varName);
+
+	out << "  .data\n"		// TODO: .bss
+		<< "  .globl " << varName << '\n';
+	out << varName << ":\n";
+	InitializerToASM(out, mir->init, mir->type);
+	out << '\n';
+}
+
 void FuncToASM(std::ostream &out, FuncInfo *mir) {
+	globals.emplace(mir->name);
+
 	std::size_t stackSize = 0, maxParam = 0;
 	bool isLeaf = true;
 	stackMgr.clear();
@@ -327,7 +387,12 @@ void FuncToASM(std::ostream &out, FuncInfo *mir) {
 	stackSize = ((stackSize + 15) >> 4) << 4;	// aligning
 	stackMgr.size = stackSize;
 
+	crtFunc = mir;
 	crtFuncName = mir->name;
+	for(std::size_t i = 0; i < mir->params.size(); ++ i) {
+		crtParams[mir->params[i]->name] = i;
+	}
+
 	out << "  .text\n";
 	out << "  .globl " << crtFuncName << '\n';
 	out << mir->name << ":\n";
@@ -362,6 +427,10 @@ void FuncToASM(std::ostream &out, FuncInfo *mir) {
 }
 
 void ProgramToASM(std::ostream &out, ProgramInfo *mir) {
+	for(auto var: mir -> vars) {
+		VarToASM(out, var);
+	}
+	std::cerr << "begin func\n";
 	for(auto func: mir -> funcs) {
 		FuncToASM(out, func);
 	}
